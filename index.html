@@ -825,7 +825,6 @@ let fbDbRef = null;
 let fbAuth = null;
 let firebaseAvailable = false;
 let authAvailable = false;
-let suppressNextRemoteRender = false;
 let cloudSyncStarted = false;
 
 try {
@@ -919,6 +918,8 @@ function normalizeDB(d){
 }
 
 let pushDebounceTimer = null;
+let lastPushedSnapshot = null; // JSON string of what WE last wrote to the cloud
+
 function pushToCloud(){
   if(!firebaseAvailable) return;
   // Debounce rapid successive edits (e.g. typing in several fields) into
@@ -926,15 +927,12 @@ function pushToCloud(){
   clearTimeout(pushDebounceTimer);
   pushDebounceTimer = setTimeout(()=>{
     setSyncStatus('offline', 'Saving…');
-    suppressNextRemoteRender = true;
+    const payload = JSON.stringify(DB);
     set(fbDbRef, DB).then(()=>{
+      lastPushedSnapshot = payload;
       setSyncStatus('online', 'Synced to cloud');
     }).catch(err=>{
       console.warn('Cloud sync failed:', err);
-      // Reset the suppression flag on failure too — otherwise a failed
-      // write leaves it stuck "true" forever and the next real update
-      // from another device would be silently ignored.
-      suppressNextRemoteRender = false;
       setSyncStatus('error', 'Sync error — saved locally only');
     });
   }, 500);
@@ -946,10 +944,13 @@ function initCloudSync(){
   get(fbDbRef).then(snapshot=>{
     if(snapshot.exists()){
       DB = normalizeDB(snapshot.val());
+      lastPushedSnapshot = JSON.stringify(DB);
       localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+      _milkEntryRenderKey = null;
       renderAll();
     } else {
-      set(fbDbRef, DB); // first run: seed the cloud with local/demo data
+      set(fbDbRef, DB); // first run only: initializes an empty record in the cloud
+      lastPushedSnapshot = JSON.stringify(DB);
     }
     setSyncStatus('online', 'Synced to cloud');
     listenForRemoteChanges();
@@ -961,10 +962,18 @@ function initCloudSync(){
 
 function listenForRemoteChanges(){
   onValue(fbDbRef, snapshot=>{
-    if(suppressNextRemoteRender){ suppressNextRemoteRender = false; return; }
     if(!snapshot.exists()) return;
+    const incoming = JSON.stringify(normalizeDB(snapshot.val()));
+    // Skip re-rendering when this update is just the echo of our own last
+    // write (content-identical) — but unlike a one-shot "suppress" flag,
+    // this comparison can never get stuck and silently swallow a genuine
+    // change from another device/tab, which previously meant a manual
+    // page refresh was sometimes needed to see the latest data.
+    if(incoming === lastPushedSnapshot) { setSyncStatus('online', 'Synced to cloud'); return; }
     DB = normalizeDB(snapshot.val());
+    lastPushedSnapshot = incoming;
     localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+    _milkEntryRenderKey = null; // DB was replaced wholesale — force the milk table to rebuild from fresh data
     renderAll();
     setSyncStatus('online', 'Synced to cloud');
   }, err=>{
@@ -986,53 +995,15 @@ function fmtMoney(n){ return '₹' + Number(n||0).toLocaleString('en-IN'); }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function seedData(){
-  const today = todayISO();
-  const cows = [
-    {id:uid('c'), tagId:'TAG-101', name:'Kamdhenu', breed:'Gir', dob:addMonths(today,-48), gender:'female', milkingStatus:'milking', status:'Active', avatar:'🐄', notes:'',
-      breeding:{aiDate:addDays(today,-160), semenBull:'Gir-Bull-04', pdStatus:'Confirmed Positive'},
-      health:{lastDeworm:addDays(today,-70), lastTickSpray:addDays(today,-40), vaccines:{FMD:addDays(today,-150),HS:addDays(today,-200),BQ:addDays(today,-280),Lumpy:addDays(today,-300)}}},
-    {id:uid('c'), tagId:'TAG-102', name:'Nandini', breed:'Sahiwal', dob:addMonths(today,-36), gender:'female', milkingStatus:'milking', status:'Active', avatar:'🐮', notes:'',
-      breeding:{}, health:{lastDeworm:addDays(today,-140), lastTickSpray:addDays(today,-110), vaccines:{FMD:addDays(today,-190),HS:addDays(today,-30),BQ:addDays(today,-370),Lumpy:addDays(today,-100)}}},
-    {id:uid('c'), tagId:'TAG-103', name:'Gauri', breed:'Gir', dob:addMonths(today,-60), gender:'female', milkingStatus:'dry', status:'Active', avatar:'🐄', notes:'Due to calve soon',
-      breeding:{aiDate:addDays(today,-260), semenBull:'Sahiwal-Bull-02', pdStatus:'Confirmed Positive'},
-      health:{lastDeworm:addDays(today,-10), lastTickSpray:addDays(today,-5), vaccines:{FMD:addDays(today,-20),HS:addDays(today,-40),BQ:addDays(today,-60),Lumpy:addDays(today,-90)}}},
-    {id:uid('c'), tagId:'TAG-104', name:'Shyam Bull', breed:'Gir', dob:addMonths(today,-30), gender:'male', milkingStatus:'not-applicable', status:'Active', avatar:'🐂', notes:'Breeding bull',
-      breeding:{}, health:{lastDeworm:addDays(today,-155), lastTickSpray:addDays(today,-125), vaccines:{}}},
-    {id:uid('c'), tagId:'TAG-105', name:'Chhoti', breed:'Sahiwal', dob:addMonths(today,-8), gender:'female', milkingStatus:'not-applicable', status:'Active', avatar:'🐣', notes:'Growing well',
-      breeding:{}, health:{lastDeworm:addDays(today,-20), lastTickSpray:addDays(today,-15), vaccines:{}}},
-    {id:uid('c'), tagId:'TAG-106', name:'—', breed:'Gir', dob:addMonths(today,-2), gender:'male', milkingStatus:'not-applicable', status:'Active', avatar:'🐣', notes:'Newborn calf',
-      breeding:{}, health:{lastDeworm:'', lastTickSpray:'', vaccines:{}}},
-    {id:uid('c'), tagId:'TAG-107', name:'Radha', breed:'Sahiwal', dob:addMonths(today,-52), gender:'female', milkingStatus:'milking', status:'Sick', avatar:'🐮', notes:'Mild fever, under vet observation',
-      breeding:{}, health:{lastDeworm:addDays(today,-95), lastTickSpray:addDays(today,-100), vaccines:{FMD:addDays(today,-175),HS:addDays(today,-10),BQ:addDays(today,-380),Lumpy:addDays(today,-370)}}},
-  ];
-  const milkRecords = [];
-  for(let i=13;i>=0;i--){
-    const d = addDays(today, -i);
-    cows.filter(c=>c.milkingStatus==='milking').forEach(c=>{
-      const base = c.tagId==='TAG-101'?9:7;
-      milkRecords.push({id:uid('m'), cowId:c.id, date:d, morning:+(base*0.55 + Math.random()*0.6).toFixed(1), evening:+(base*0.45+Math.random()*0.5).toFixed(1)});
-    });
-  }
-  const distribution = [];
-  for(let i=6;i>=0;i--){
-    const d = addDays(today,-i);
-    distribution.push({date:d, sales:14, calf:2.5, internal:1.5});
-  }
-  const ledger = [
-    {id:uid('l'), date:addDays(today,-3), type:'income', category:'Milk Sales', amount:4200, note:'Weekly milk sale to dairy'},
-    {id:uid('l'), date:addDays(today,-3), type:'expense', category:'Feed', amount:1800, note:'Bhusa & concentrate purchase'},
-    {id:uid('l'), date:addDays(today,-1), type:'expense', category:'Medicine', amount:650, note:'Vet visit + medication'},
-    {id:uid('l'), date:today, type:'income', category:'Compost / Gobar Sales', amount:900, note:'Vermicompost sale'},
-  ];
-  const feedItems = [
-    {id:uid('f'), name:'Green Fodder (Napier/Bajra)', stock:850, unit:'kg', daily:180, threshold:200},
-    {id:uid('f'), name:'Dry Fodder (Bhusa)', stock:320, unit:'kg', daily:70, threshold:150},
-    {id:uid('f'), name:'Concentrate (Khali/Mix)', stock:95, unit:'kg', daily:35, threshold:100},
-  ];
-  const hygieneLogs = [{id:uid('h'), date:addDays(today,-2), type:'Phenyle Spray', note:'Full shed'}];
-  const compostLogs = [{id:uid('cp'), date:addDays(today,-4), type:'Vermicompost', qty:40, unit:'kg'}];
-  const checklists = {};
-  return {cows, milkRecords, distribution, ledger, feedItems, vetLogs:[], hygieneLogs, compostLogs, checklists};
+  // A brand-new gaushala should start with a genuinely EMPTY database —
+  // not fictional demo cows. Earlier versions of this file auto-created
+  // sample cows (Kamdhenu, Nandini, etc.) and pushed them straight to the
+  // shared Firebase database on first load, which is why fake records
+  // used to show up before any real data entry. That has been removed.
+  return {
+    cows: [], milkRecords: [], distribution: [], ledger: [], feedItems: [],
+    vetLogs: [], hygieneLogs: [], compostLogs: [], checklists: {}
+  };
 }
 
 let DB = load();
@@ -1451,8 +1422,11 @@ document.getElementById('editCowFromDetailBtn').addEventListener('click', ()=>{
   openModal('cowModalBackdrop');
 });
 document.getElementById('deleteCowBtn').addEventListener('click', ()=>{
-  if(!confirm('Delete this cow profile and all associated records reference? This cannot be undone.')) return;
-  DB.cows = DB.cows.filter(c=>c.id!==currentDetailCowId);
+  if(!confirm('Delete this cow profile and all associated records (milk entries, vet logs)? This cannot be undone.')) return;
+  const id = currentDetailCowId;
+  DB.cows = DB.cows.filter(c=>c.id!==id);
+  DB.milkRecords = DB.milkRecords.filter(m=>m.cowId!==id);
+  DB.vetLogs = DB.vetLogs.filter(v=>v.cowId!==id);
   save(); closeModal('cowDetailBackdrop'); renderAll(); toast('Cow removed');
 });
 
@@ -1644,37 +1618,48 @@ document.getElementById('saveFeedBtn').addEventListener('click', ()=>{
 });
 
 /* ======================= MILK & FINANCE ======================= */
+let _milkEntryRenderKey = null; // "date|cowId,cowId,..." signature of what's currently in the DOM
 function renderMilk(){
   const dateInput = document.getElementById('milkEntryDate');
   if(!dateInput.value) dateInput.value = todayISO();
   const date = dateInput.value;
   const milkingCows = DB.cows.filter(c=>c.milkingStatus==='milking' && c.status!=='Sold' && c.status!=='Deceased');
-  document.getElementById('milkEntryTable').innerHTML = milkingCows.map(c=>{
-    const rec = DB.milkRecords.find(m=>m.cowId===c.id && m.date===date) || {morning:'',evening:''};
-    return `<tr data-cow="${c.id}">
-      <td><b>${esc(c.tagId)}</b> ${esc(c.name)}</td>
-      <td><input type="number" min="0" step="0.1" class="mMorning" value="${rec.morning}"></td>
-      <td><input type="number" min="0" step="0.1" class="mEvening" value="${rec.evening}"></td>
-      <td class="mTotal">${(Number(rec.morning||0)+Number(rec.evening||0)).toFixed(1)}</td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="4" class="empty-note">No cows currently marked as milking.</td></tr>`;
+  const renderKey = date + '|' + milkingCows.map(c=>c.id).join(',');
 
-  document.querySelectorAll('.mMorning, .mEvening').forEach(inp=>{
-    inp.addEventListener('input', e=>{
-      const row = e.target.closest('tr');
-      const m = +row.querySelector('.mMorning').value||0, ev = +row.querySelector('.mEvening').value||0;
-      row.querySelector('.mTotal').textContent = (m+ev).toFixed(1);
-      const total = [...document.querySelectorAll('#milkEntryTable tr')].reduce((s,r)=>{
-        const mm=+r.querySelector('.mMorning')?.value||0, ee=+r.querySelector('.mEvening')?.value||0; return s+mm+ee;
-      },0);
-      document.getElementById('milkTotalToday').textContent = `Total: ${total.toFixed(1)} L`;
+  // Only rebuild the input rows when the entry date or the list of
+  // milking cows has actually changed. Previously this table was
+  // regenerated from scratch on EVERY save anywhere in the app (adding a
+  // vet log, ticking an ops checklist, switching tabs, etc.), which wiped
+  // out any morning/evening figures the user had typed but not yet saved.
+  if(renderKey !== _milkEntryRenderKey){
+    _milkEntryRenderKey = renderKey;
+    document.getElementById('milkEntryTable').innerHTML = milkingCows.map(c=>{
+      const rec = DB.milkRecords.find(m=>m.cowId===c.id && m.date===date) || {morning:'',evening:''};
+      return `<tr data-cow="${c.id}">
+        <td><b>${esc(c.tagId)}</b> ${esc(c.name)}</td>
+        <td><input type="number" min="0" step="0.1" class="mMorning" value="${rec.morning}"></td>
+        <td><input type="number" min="0" step="0.1" class="mEvening" value="${rec.evening}"></td>
+        <td class="mTotal">${(Number(rec.morning||0)+Number(rec.evening||0)).toFixed(1)}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="4" class="empty-note">No cows currently marked as milking.</td></tr>`;
+
+    document.querySelectorAll('.mMorning, .mEvening').forEach(inp=>{
+      inp.addEventListener('input', e=>{
+        const row = e.target.closest('tr');
+        const m = +row.querySelector('.mMorning').value||0, ev = +row.querySelector('.mEvening').value||0;
+        row.querySelector('.mTotal').textContent = (m+ev).toFixed(1);
+        const total = [...document.querySelectorAll('#milkEntryTable tr')].reduce((s,r)=>{
+          const mm=+r.querySelector('.mMorning')?.value||0, ee=+r.querySelector('.mEvening')?.value||0; return s+mm+ee;
+        },0);
+        document.getElementById('milkTotalToday').textContent = `Total: ${total.toFixed(1)} L`;
+      });
     });
-  });
-  const total0 = milkingCows.reduce((s,c)=>{
-    const rec = DB.milkRecords.find(m=>m.cowId===c.id && m.date===date);
-    return s + (rec? Number(rec.morning||0)+Number(rec.evening||0):0);
-  },0);
-  document.getElementById('milkTotalToday').textContent = `Total: ${total0.toFixed(1)} L`;
+    const total0 = milkingCows.reduce((s,c)=>{
+      const rec = DB.milkRecords.find(m=>m.cowId===c.id && m.date===date);
+      return s + (rec? Number(rec.morning||0)+Number(rec.evening||0):0);
+    },0);
+    document.getElementById('milkTotalToday').textContent = `Total: ${total0.toFixed(1)} L`;
+  }
 
   // lactation select
   const sel = document.getElementById('lactationCowSelect');
@@ -1820,7 +1805,7 @@ document.getElementById('importJsonInput').addEventListener('change', e=>{
     try{
       const parsed = JSON.parse(ev.target.result);
       if(!parsed || !Array.isArray(parsed.cows)){ toast('Invalid backup file — missing cows list'); return; }
-      DB = normalizeDB(parsed); save(); renderAll(); toast('Backup restored');
+      DB = normalizeDB(parsed); _milkEntryRenderKey = null; save(); renderAll(); toast('Backup restored');
     }catch(err){ toast('Could not read file — is it a valid JSON backup?'); }
   };
   reader.readAsText(file);
@@ -1837,9 +1822,12 @@ document.getElementById('exportLedgerCsv').addEventListener('click', ()=>{
   downloadFile(`ledger-${todayISO()}.csv`, toCSV(DB.ledger, ['date','type','category','amount','note']), 'text/csv');
 });
 document.getElementById('resetAllBtn').addEventListener('click', ()=>{
-  if(!confirm('This will erase ALL data in this browser. Continue?')) return;
+  if(!confirm('This will erase ALL data — including the shared cloud copy every device syncs from. Continue?')) return;
   localStorage.removeItem(STORE_KEY);
   DB = load();
+  _milkEntryRenderKey = null;
+  save(); // also push the cleared state to Firebase, otherwise the old cloud
+          // data would silently come back on the next page load/sync
   renderAll(); toast('All data erased');
 });
 
