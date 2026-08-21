@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Gau-Sanchalan · Gaushala Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#F3F5EE;
+  --surface:#FFFFFF;
+  --surface-2:#EEF1E7;
+  --ink:#1E2A20;
+  --ink-soft:#5B6B5D;
+  --ink-faint:#8B9A8C;
+  --line:#DFE3D6;
+  --primary:#2F5233;
+  --primary-deep:#203A24;
+  --primary-tint:#E4ECDF;
+  --accent:#E8A33D;
+  --accent-deep:#B9781F;
+  --accent-tint:#FBEBD1;
+  --danger:#C1502E;
+  --danger-tint:#F8E1D7;
+  --warning:#D98E2B;
+  --warning-tint:#FBEBD1;
+  --success:#5C8449;
+  --success-tint:#E5EEDD;
+  --info:#3D6B8A;
+  --info-tint:#DFEBF1;
+  --radius-sm:8px;
+  --radius:14px;
+  --radius-lg:20px;
+  --shadow:0 1px 2px rgba(30,42,32,.04), 0 8px 24px -12px rgba(30,42,32,.16);
+  --font-display:'Fraunces', serif;
+  --font-body:'Inter', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:var(--font-body);
+  background:var(--bg);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--accent-tint);color:var(--primary-deep);}
+h1,h2,h3,h4{font-family:var(--font-display);color:var(--ink);margin:0;letter-spacing:-.01em;}
+a{color:inherit;}
+button{font-family:inherit;}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+
+/* ===== Layout shell ===== */
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100vh;}
+.sidebar{
+  background:var(--primary-deep);
+  color:#EDF2E8;
+  padding:22px 14px;
+  display:flex;flex-direction:column;gap:4px;
+  position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 22px;}
+.brand-mark{
+  width:38px;height:38px;border-radius:50%;
+  background:conic-gradient(var(--accent) 0deg 130deg, var(--success) 130deg 230deg, var(--info) 230deg 300deg, var(--warning) 300deg 360deg);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:inset 0 0 0 3px var(--primary-deep), inset 0 0 0 5px rgba(255,255,255,.18);
+}
+.brand-mark span{font-size:15px;}
+.brand-text .en{font-family:var(--font-display);font-size:18px;font-weight:600;line-height:1.1;color:#fff;}
+.brand-text .hi{font-size:11px;color:#B9C9B4;letter-spacing:.04em;}
+.nav{display:flex;flex-direction:column;gap:2px;margin-top:6px;flex:1;overflow-y:auto;}
+.nav-item{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 12px;border-radius:10px;cursor:pointer;
+  color:#CBD8C6;font-size:13.5px;font-weight:500;
+  transition:background .15s,color .15s;
+  border:1px solid transparent;
+}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff;}
+.nav-item.active{background:rgba(232,163,61,.14);color:#fff;border-color:rgba(232,163,61,.35);}
+.nav-item .ic{width:20px;text-align:center;font-size:15px;}
+.nav-item .sub{font-size:10px;color:#8FA48A;font-weight:400;margin-left:auto;}
+.sidebar-foot{padding:10px 12px 0;border-top:1px solid rgba(255,255,255,.1);margin-top:8px;}
+.sidebar-foot .clock{font-family:var(--font-mono);font-size:12px;color:#9FB299;padding-top:10px;}
+.sync-status{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#B9C9B4;font-weight:500;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex-shrink:0;transition:background .3s;}
+.sync-status.online .sync-dot{background:#7BC67E;box-shadow:0 0 0 3px rgba(123,198,126,.18);}
+.sync-status.offline .sync-dot{background:var(--accent);box-shadow:0 0 0 3px rgba(232,163,61,.18);}
+.sync-status.error .sync-dot{background:var(--danger);box-shadow:0 0 0 3px rgba(193,80,46,.2);}
+
+.main{min-width:0;display:flex;flex-direction:column;}
+.topbar{
+  position:sticky;top:0;z-index:20;
+  background:rgba(243,245,238,.88);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);
+  padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+.topbar h2{font-size:22px;}
+.topbar .hi-sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+.topbar-actions{display:flex;gap:10px;align-items:center;}
+.search-box{position:relative;}
+.search-box input{
+  padding:9px 12px 9px 32px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface);font-size:13px;width:220px;outline:none;
+}
+.search-box input:focus{border-color:var(--primary);}
+.search-box .ic{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--ink-faint);}
+
+.content{padding:24px 28px 60px;flex:1;}
+.view{display:none;animation:fadein .25s ease;}
+.view.active{display:block;}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+/* ===== Buttons / inputs ===== */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 16px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;
+  transition:transform .1s, box-shadow .15s, background .15s;
+}
+.btn:hover{box-shadow:var(--shadow);}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff;}
+.btn.primary:hover{background:var(--primary-deep);}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:#3A2705;}
+.btn.ghost{background:transparent;border-color:transparent;}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff;}
+.btn.sm{padding:6px 11px;font-size:12px;border-radius:8px;}
+.btn.icon-only{padding:7px 9px;}
+label{font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:5px;}
+input,select,textarea{
+  width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);
+  background:var(--surface);font-family:inherit;font-size:13.5px;color:var(--ink);outline:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-tint);}
+.field{margin-bottom:13px;}
+.field-row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));}
+
+/* ===== Cards / KPIs ===== */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:22px;}
+.kpi-card{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;position:relative;overflow:hidden;
+}
+.kpi-card .num{font-family:var(--font-display);font-size:30px;font-weight:600;line-height:1;margin-top:6px;}
+.kpi-card .lbl{font-size:11.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;font-weight:600;}
+.kpi-card .hi{font-size:11px;color:var(--ink-faint);margin-top:2px;}
+.kpi-card.warn{background:var(--warning-tint);}
+.kpi-card.warn .num{color:var(--accent-deep);}
+
+.section{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:20px 22px;margin-bottom:20px;}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+.section-head h3{font-size:17px;}
+.section-head .hi{font-size:11px;color:var(--ink-faint);font-weight:500;}
+
+/* wave divider - signature rhythm marker between morning/evening rhythms */
+.rhythm-divider{width:100%;height:22px;margin:4px 0 18px;opacity:.55;}
+
+/* ===== Alerts ===== */
+.alert-list{display:flex;flex-direction:column;gap:8px;}
+.alert-row{
+  display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:11px;
+  border:1px solid var(--line);background:var(--surface-2);font-size:13px;
+}
+.alert-row.urgent{background:var(--danger-tint);border-color:#EBC1AE;}
+.alert-row.soon{background:var(--warning-tint);border-color:#F0D49B;}
+.alert-row.info{background:var(--info-tint);border-color:#BFDAE7;}
+.alert-row .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.alert-row.urgent .dot{background:var(--danger);}
+.alert-row.soon .dot{background:var(--warning);}
+.alert-row.info .dot{background:var(--info);}
+.alert-row b{font-weight:700;}
+.alert-row .tag{margin-left:auto;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);}
+.empty-note{color:var(--ink-faint);font-size:13px;padding:14px 4px;}
+
+/* ===== Badges ===== */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+.badge.active{background:var(--success-tint);color:#3E5C31;}
+.badge.sick{background:var(--danger-tint);color:#8C3A1F;}
+.badge.isolated{background:var(--warning-tint);color:#8C5D14;}
+.badge.sold{background:#E7E4EE;color:#5A5470;}
+.badge.deceased{background:#E7E3DD;color:#6B6259;}
+.cat-chip{display:inline-block;padding:3px 9px;border-radius:8px;font-size:11px;font-weight:600;background:var(--primary-tint);color:var(--primary-deep);}
+
+/* ===== Ring (signature element) ===== */
+.ring{
+  width:52px;height:52px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;position:relative;
+}
+.ring .hole{width:42px;height:42px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:16px;}
+
+/* ===== Cow grid ===== */
+.cow-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+.cow-toolbar select, .cow-toolbar input{width:auto;min-width:140px;}
+.cow-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+.cow-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px;transition:box-shadow .15s, transform .15s;cursor:pointer;}
+.cow-card:hover{box-shadow:var(--shadow);transform:translateY(-2px);}
+.cow-card-top{display:flex;gap:12px;align-items:center;}
+.cow-card .name{font-family:var(--font-display);font-size:16.5px;font-weight:600;}
+.cow-card .tag{font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);}
+.cow-card .meta{margin-top:10px;font-size:12px;color:var(--ink-soft);display:flex;flex-direction:column;gap:4px;}
+.cow-card .badges-row{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;}
+
+/* ===== Table ===== */
+.table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line);}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px;}
+th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);background:var(--surface-2);padding:10px 12px;font-weight:700;white-space:nowrap;}
+td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:middle;}
+tr:hover td{background:#FAFBF7;}
+
+/* ===== Modal ===== */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(20,26,18,.45);backdrop-filter:blur(2px);
+  display:none;align-items:flex-start;justify-content:center;z-index:100;overflow-y:auto;padding:40px 16px;
+}
+.modal-backdrop.show{display:flex;}
+.modal{background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:560px;padding:24px 26px;box-shadow:0 20px 60px -20px rgba(0,0,0,.35);max-height:88vh;overflow-y:auto;}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.modal-head h3{font-size:19px;}
+.modal-close{cursor:pointer;font-size:20px;color:var(--ink-faint);background:none;border:none;line-height:1;}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+
+/* ===== Progress / stock bars ===== */
+.stockbar{height:8px;border-radius:6px;background:var(--surface-2);overflow:hidden;margin-top:8px;}
+.stockbar > div{height:100%;border-radius:6px;background:var(--success);}
+.stockbar.low > div{background:var(--danger);}
+.stockbar.mid > div{background:var(--warning);}
+
+.feed-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;}
+.feed-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+
+.tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+.tab-btn{padding:8px 14px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;}
+.tab-btn.active{color:var(--primary-deep);border-color:var(--accent);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+.checklist{display:flex;flex-direction:column;gap:8px;}
+.check-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface-2);border-radius:10px;font-size:13.5px;}
+.check-row input[type=checkbox]{width:17px;height:17px;accent-color:var(--primary);flex-shrink:0;}
+.check-row.done{opacity:.55;text-decoration:line-through;}
+
+.hint{font-size:11.5px;color:var(--ink-faint);margin-top:4px;}
+.two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;}
+@media(max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.pill-toggle{display:flex;gap:6px;flex-wrap:wrap;}
+.pill{padding:6px 12px;border-radius:20px;border:1px solid var(--line);font-size:12px;cursor:pointer;background:var(--surface);}
+.pill.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+
+.export-row{display:flex;gap:10px;flex-wrap:wrap;}
+
+.toast{
+  position:fixed;bottom:22px;right:22px;background:var(--primary-deep);color:#fff;
+  padding:12px 18px;border-radius:12px;font-size:13px;box-shadow:var(--shadow);z-index:200;
+  display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* mobile */
+.hamburger{display:none;}
+h2{font-size:clamp(17px,4.5vw,22px);}
+.kpi-card .num{font-size:clamp(22px,5.5vw,30px);}
+@media(max-width:880px){
+  .app{grid-template-columns:1fr;}
+  .sidebar{
+    position:fixed;left:0;top:0;bottom:0;z-index:150;width:230px;
+    transform:translateX(-100%);transition:transform .2s;
+    padding-top:max(22px, env(safe-area-inset-top));
+  }
+  .sidebar.open{transform:translateX(0);}
+  .hamburger{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:16px;cursor:pointer;flex-shrink:0;}
+  .topbar{padding:12px 14px;}
+  .content{padding:14px 14px 60px;}
+  .search-box input{width:130px;}
+  .modal{max-width:100%;}
+  .modal-backdrop{padding:14px 10px;align-items:flex-start;}
+  .sidebar-scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:140;}
+  .sidebar-scrim.show{display:block;}
+}
+/* very small screens (small phones, e.g. 320-400px) */
+@media(max-width:480px){
+  body{font-size:14px;}
+  .topbar{flex-wrap:wrap;gap:8px;padding:10px 12px;}
+  .topbar h2{font-size:16.5px;}
+  .hi-sub{font-size:10.5px;}
+  .topbar-actions{width:100%;justify-content:space-between;gap:8px;}
+  .search-box{flex:1;}
+  .search-box input{width:100%;min-width:0;padding:8px 10px 8px 30px;font-size:12.5px;}
+  #quickAddCow{padding:8px 12px;font-size:12px;white-space:nowrap;}
+  .content{padding:10px 10px 50px;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;}
+  .kpi-card{padding:12px 13px;border-radius:12px;}
+  .kpi-card .lbl{font-size:10px;}
+  .kpi-card .hi{font-size:10px;}
+  .section{padding:15px 14px;border-radius:14px;margin-bottom:14px;}
+  .section-head h3{font-size:15px;}
+  .two-col{gap:14px;}
+  .cow-toolbar{gap:8px;}
+  .cow-toolbar select,.cow-toolbar input{min-width:0;flex:1 1 45%;font-size:12.5px;padding:8px 9px;}
+  .cow-grid{grid-template-columns:1fr;gap:10px;}
+  .cow-card{padding:13px;}
+  .field-row{grid-template-columns:1fr;gap:10px;}
+  .modal{padding:18px 16px;max-height:92vh;border-radius:16px;}
+  .modal-head h3{font-size:16px;}
+  .modal-foot{flex-direction:column-reverse;gap:8px;}
+  .modal-foot .btn{width:100%;justify-content:center;}
+  table{font-size:12px;min-width:520px;}
+  th,td{padding:8px 9px;}
+  .tabs{gap:2px;}
+  .tab-btn{padding:7px 10px;font-size:12px;}
+  .feed-grid{grid-template-columns:1fr;}
+  .export-row .btn{width:100%;justify-content:center;}
+  .export-row{flex-direction:column;}
+  .nav-item{padding:9px 10px;font-size:13px;}
+  .brand-mark{width:34px;height:34px;}
+  .brand-text .en{font-size:16px;}
+}
+@media(max-width:360px){
+  .kpi-grid{grid-template-columns:1fr 1fr;}
+  .kpi-card .num{font-size:20px;}
+  .cow-toolbar select,.cow-toolbar input{flex:1 1 100%;}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar-scrim" id="scrim"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><span>🐄</span></div>
+      <div class="brand-text">
+        <div class="en">Gau-Sanchalan</div>
+        <div class="hi">गौशाला प्रबंधन</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-item active" data-view="dashboard"><span class="ic">◈</span> Dashboard <span class="sub">डैशबोर्ड</span></div>
+      <div class="nav-item" data-view="cows"><span class="ic">🐮</span> Cow Profiles <span class="sub">गाय</span></div>
+      <div class="nav-item" data-view="breeding"><span class="ic">🤰</span> Breeding <span class="sub">प्रजनन</span></div>
+      <div class="nav-item" data-view="health"><span class="ic">💉</span> Health <span class="sub">स्वास्थ्य</span></div>
+      <div class="nav-item" data-view="feed"><span class="ic">🌾</span> Feed & Fodder <span class="sub">चारा</span></div>
+      <div class="nav-item" data-view="milk"><span class="ic">🥛</span> Milk & Finance <span class="sub">दूध</span></div>
+      <div class="nav-item" data-view="ops"><span class="ic">🧹</span> Operations <span class="sub">कार्य</span></div>
+      <div class="nav-item" data-view="settings"><span class="ic">⚙</span> Data & Backup</div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="sync-status" id="syncStatus"><span class="sync-dot"></span> Connecting…</div>
+      <div class="clock" id="clock"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="hamburger" id="hamburgerBtn">☰</button>
+        <div>
+          <h2 id="viewTitle">Dashboard</h2>
+          <div class="hi-sub" id="viewSub">Herd overview · today's snapshot</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="search-box"><span class="ic">⌕</span><input id="globalSearch" placeholder="Search Tag ID, name..."></div>
+        <button class="btn primary" id="quickAddCow">+ Add Cow</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ================= DASHBOARD ================= -->
+      <section class="view active" id="view-dashboard">
+        <div class="kpi-grid" id="kpiGrid"></div>
+        <div class="two-col">
+          <div class="section">
+            <div class="section-head"><h3>Alerts requiring attention</h3><span class="hi">आज ध्यान दें</span></div>
+            <div class="alert-list" id="alertList"></div>
+          </div>
+          <div class="section">
+            <div class="section-head"><h3>Herd composition</h3></div>
+            <canvas id="compositionChart" height="210"></canvas>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h3>Milk yield — last 14 days</h3><span class="hi">दैनिक दूध उत्पादन</span></div>
+          <canvas id="milkTrendChart" height="90"></canvas>
+        </div>
+      </section>
+
+      <!-- ================= COWS ================= -->
+      <section class="view" id="view-cows">
+        <div class="cow-toolbar">
+          <select id="filterCategory">
+            <option value="">All categories</option>
+            <option>Bull</option><option>Milking Cow</option><option>Dry Cow</option><option>Heifer</option><option>Calf</option><option>Male Calf</option>
+          </select>
+          <select id="filterStatus">
+            <option value="">All statuses</option>
+            <option>Active</option><option>Sick</option><option>Isolated</option><option>Sold</option><option>Deceased</option>
+          </select>
+          <select id="filterPregMonth">
+            <option value="">Pregnancy: any</option>
+            <option value="1">Month 1-3</option><option value="2">Month 4-6</option><option value="3">Month 7-9 (due soon)</option>
+          </select>
+          <input id="cowSearchBox" placeholder="Filter by Tag ID or name…" style="max-width:220px;">
+          <button class="btn sm ghost" id="clearFilters">Clear filters</button>
+          <button class="btn accent" style="margin-left:auto" id="addCowBtn2">+ Add Cow</button>
+        </div>
+        <div class="cow-grid" id="cowGrid"></div>
+      </section>
+
+      <!-- ================= BREEDING ================= -->
+      <section class="view" id="view-breeding">
+        <div class="section">
+          <div class="section-head"><h3>Pregnancy & breeding tracker</h3><span class="hi">EDD = AI Date + 283 days · Dry alert = EDD − 60 days</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cow</th><th>AI / Mating Date</th><th>Semen / Bull</th><th>PD Status</th><th>Expected Delivery</th><th>Dry Date Alert</th><th>Countdown</th><th></th></tr></thead>
+              <tbody id="breedingTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= HEALTH ================= -->
+      <section class="view" id="view-health">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="h-schedule">Recurring schedule</button>
+          <button class="tab-btn" data-tab="h-vaccine">Vaccination calendar</button>
+          <button class="tab-btn" data-tab="h-vet">Vet / medical log</button>
+        </div>
+        <div class="tab-panel active" id="tab-h-schedule">
+          <div class="section-head" style="margin-bottom:10px;"><span class="hi">Deworming every 5 months · Tick/Chichdi spray every 4 months</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cow</th><th>Last Deworm</th><th>Next Deworm Due</th><th>Last Tick/Chichdi Spray</th><th>Next Spray Due</th><th></th></tr></thead>
+              <tbody id="healthScheduleTable"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-panel" id="tab-h-vaccine">
+          <div class="section-head" style="margin-bottom:10px;"><span class="hi">FMD (Khurpaka-Munhpaka) ×2/yr · HS (Galghontu) pre-monsoon annual · BQ & Lumpy Skin — annual</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cow</th><th>Vaccine</th><th>Last Given</th><th>Next Due</th><th>Status</th><th></th></tr></thead>
+              <tbody id="vaccineTable"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-panel" id="tab-h-vet">
+          <div class="section-head"><button class="btn accent sm" id="addVetLogBtn">+ Add vet log entry</button></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Cow</th><th>Diagnosis</th><th>Medication</th><th>Next follow-up</th><th>Isolation</th></tr></thead>
+              <tbody id="vetLogTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= FEED ================= -->
+      <section class="view" id="view-feed">
+        <div class="section">
+          <div class="section-head"><h3>Fodder & concentrate stock</h3><button class="btn accent sm" id="addFeedItemBtn">+ Add stock item</button></div>
+          <div class="feed-grid" id="feedGrid"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h3>Ration plan reference</h3><span class="hi">दैनिक राशन योजना</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Stage</th><th>Green Fodder</th><th>Dry Fodder (Bhusa)</th><th>Concentrate (Khali)</th><th>Notes</th></tr></thead>
+              <tbody>
+                <tr><td><span class="cat-chip">High Yielder (10L+)</span></td><td>25–30 kg</td><td>5–6 kg</td><td>4–5 kg</td><td>Split feeding around milking times</td></tr>
+                <tr><td><span class="cat-chip">Low Yielder / Dry</span></td><td>15–20 kg</td><td>4–5 kg</td><td>1.5–2 kg</td><td>Maintenance ration only</td></tr>
+                <tr><td><span class="cat-chip">Pregnant (last trimester)</span></td><td>20–25 kg</td><td>5 kg</td><td>3–4 kg + mineral mixture</td><td>High-protein/mineral supplement</td></tr>
+                <tr><td><span class="cat-chip">Calves</span></td><td>Starter feed only</td><td>—</td><td>Milk replacer as scheduled</td><td>Wean gradually after 3 months</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MILK & FINANCE ================= -->
+      <section class="view" id="view-milk">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="m-entry">Daily milk entry</button>
+          <button class="tab-btn" data-tab="m-curve">Lactation curve</button>
+          <button class="tab-btn" data-tab="m-dist">Usage distribution</button>
+          <button class="tab-btn" data-tab="m-ledger">Financial ledger</button>
+        </div>
+        <div class="tab-panel active" id="tab-m-entry">
+          <div class="section-head">
+            <div class="field-row" style="flex:1;max-width:260px;">
+              <div class="field"><label>Entry date</label><input type="date" id="milkEntryDate"></div>
+            </div>
+            <div class="hi" id="milkTotalToday" style="font-size:13px;font-weight:700;color:var(--primary-deep);"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cow</th><th>Morning (L)</th><th>Evening (L)</th><th>Total (L)</th></tr></thead>
+              <tbody id="milkEntryTable"></tbody>
+            </table>
+          </div>
+          <div style="margin-top:14px;"><button class="btn primary" id="saveMilkEntryBtn">Save entries</button></div>
+        </div>
+        <div class="tab-panel" id="tab-m-curve">
+          <div class="field" style="max-width:280px;"><label>Select cow</label><select id="lactationCowSelect"></select></div>
+          <canvas id="lactationChart" height="100"></canvas>
+        </div>
+        <div class="tab-panel" id="tab-m-dist">
+          <div class="field-row">
+            <div class="field"><label>Date</label><input type="date" id="distDate"></div>
+            <div class="field"><label>Sold (L)</label><input type="number" id="distSales" min="0" step="0.1"></div>
+            <div class="field"><label>Calf feeding (L)</label><input type="number" id="distCalf" min="0" step="0.1"></div>
+            <div class="field"><label>Internal use (L)</label><input type="number" id="distInternal" min="0" step="0.1"></div>
+          </div>
+          <button class="btn primary" id="saveDistBtn">Save distribution</button>
+          <div class="table-wrap" style="margin-top:16px;">
+            <table><thead><tr><th>Date</th><th>Total Milked</th><th>Sold</th><th>Calf</th><th>Internal</th></tr></thead><tbody id="distTable"></tbody></table>
+          </div>
+        </div>
+        <div class="tab-panel" id="tab-m-ledger">
+          <div class="section-head"><button class="btn accent sm" id="addLedgerBtn">+ Add income / expense</button></div>
+          <div class="kpi-grid" id="financeKpis" style="margin-bottom:14px;"></div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Amount (₹)</th><th>Note</th><th></th></tr></thead><tbody id="ledgerTable"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= OPERATIONS ================= -->
+      <section class="view" id="view-ops">
+        <div class="two-col">
+          <div class="section">
+            <div class="section-head"><h3>Today's labour checklist</h3><span class="hi" id="opsDateLabel"></span></div>
+            <div class="checklist" id="checklistBox"></div>
+          </div>
+          <div class="section">
+            <div class="section-head"><h3>Shed hygiene log</h3></div>
+            <div class="field"><label>Activity</label>
+              <select id="hygieneType"><option>Phenyle Spray</option><option>Chuna (Lime) Application</option><option>Water Trough Cleaning</option><option>Sprinkler / Shed Disinfection</option></select>
+            </div>
+            <div class="field"><label>Date</label><input type="date" id="hygieneDate"></div>
+            <div class="field"><label>Note</label><input id="hygieneNote" placeholder="Optional note"></div>
+            <button class="btn primary sm" id="addHygieneBtn">Log entry</button>
+            <div class="table-wrap" style="margin-top:14px;">
+              <table><thead><tr><th>Date</th><th>Activity</th><th>Note</th></tr></thead><tbody id="hygieneTable"></tbody></table>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h3>Compost & manure tracking</h3><span class="hi">Biogas / Vermicompost yield</span></div>
+          <div class="field-row">
+            <div class="field"><label>Date</label><input type="date" id="compostDate"></div>
+            <div class="field"><label>Type</label><select id="compostType"><option>Vermicompost</option><option>Biogas Slurry</option><option>Raw Manure Sale</option></select></div>
+            <div class="field"><label>Quantity</label><input type="number" id="compostQty" min="0" step="0.1"></div>
+            <div class="field"><label>Unit</label><select id="compostUnit"><option>kg</option><option>quintal</option><option>cu.m (biogas)</option></select></div>
+          </div>
+          <button class="btn primary sm" id="addCompostBtn">Log entry</button>
+          <div class="table-wrap" style="margin-top:14px;">
+            <table><thead><tr><th>Date</th><th>Type</th><th>Quantity</th></tr></thead><tbody id="compostTable"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SETTINGS ================= -->
+      <section class="view" id="view-settings">
+        <div class="section">
+          <div class="section-head"><h3>Backup & data portability</h3><span class="hi">All data is stored locally in this browser</span></div>
+          <p style="font-size:13px;color:var(--ink-soft);max-width:640px;">Export a full backup as JSON (safe restore) or export individual modules as CSV for Excel. Data lives in this browser's local storage — export regularly if you use a shared computer.</p>
+          <div class="export-row">
+            <button class="btn primary" id="exportJsonBtn">⭳ Export full backup (JSON)</button>
+            <label class="btn" style="cursor:pointer;">⭱ Import backup (JSON)<input type="file" id="importJsonInput" accept="application/json" style="display:none;"></label>
+            <button class="btn" id="exportCowsCsv">⭳ Export Cows (CSV)</button>
+            <button class="btn" id="exportMilkCsv">⭳ Export Milk Records (CSV)</button>
+            <button class="btn" id="exportLedgerCsv">⭳ Export Ledger (CSV)</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h3>Reset</h3></div>
+          <p style="font-size:13px;color:var(--ink-soft);">This clears all cows, records and logs from this browser. Export a backup first.</p>
+          <button class="btn danger" id="resetAllBtn">Erase all data</button>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-backdrop" id="cowModalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3 id="cowModalTitle">Add Cow</h3><button class="modal-close" data-close="cowModalBackdrop">×</button></div>
+    <input type="hidden" id="cowId">
+    <div class="field-row">
+      <div class="field"><label>Tag ID *</label><input id="cowTagId" placeholder="TAG-101"></div>
+      <div class="field"><label>Name</label><input id="cowName" placeholder="e.g. Kamdhenu"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Breed</label><input id="cowBreed" placeholder="e.g. Gir, Sahiwal"></div>
+      <div class="field"><label>Date of Birth *</label><input type="date" id="cowDob"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Gender *</label><select id="cowGender"><option value="female">Female</option><option value="male">Male</option></select></div>
+      <div class="field"><label>Milking status (if applicable)</label><select id="cowMilkingStatus"><option value="not-applicable">N/A</option><option value="milking">Milking</option><option value="dry">Dry</option></select></div>
+    </div>
+    <div class="field"><label>Status</label>
+      <select id="cowStatus"><option>Active</option><option>Sick</option><option>Isolated</option><option>Sold</option><option>Deceased</option></select>
+    </div>
+    <div class="field"><label>Avatar emoji</label>
+      <div class="pill-toggle" id="avatarPicker">
+        <span class="pill" data-emoji="🐄">🐄</span><span class="pill" data-emoji="🐮">🐮</span><span class="pill" data-emoji="🐂">🐂</span><span class="pill" data-emoji="🐃">🐃</span><span class="pill" data-emoji="🐣">🐣</span>
+      </div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="cowNotes" rows="2"></textarea></div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close="cowModalBackdrop">Cancel</button>
+      <button class="btn primary" id="saveCowBtn">Save Cow</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="cowDetailBackdrop">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head"><h3 id="cowDetailTitle">Cow Detail</h3><button class="modal-close" data-close="cowDetailBackdrop">×</button></div>
+    <div id="cowDetailBody"></div>
+    <div class="modal-foot">
+      <button class="btn danger sm" id="deleteCowBtn">Delete cow</button>
+      <button class="btn primary sm" id="editCowFromDetailBtn">Edit</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="breedingModalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3>Update Breeding Record</h3><button class="modal-close" data-close="breedingModalBackdrop">×</button></div>
+    <input type="hidden" id="breedingCowId">
+    <div class="field"><label>Cow</label><div id="breedingCowLabel" style="font-weight:700;"></div></div>
+    <div class="field-row">
+      <div class="field"><label>AI / Mating Date</label><input type="date" id="aiDate"></div>
+      <div class="field"><label>Semen Bull ID / Breed</label><input id="semenBull" placeholder="e.g. Gir-Bull-04"></div>
+    </div>
+    <div class="field"><label>PD Status (checked at 60 days)</label>
+      <select id="pdStatus"><option>Pending</option><option>Confirmed Positive</option><option>Negative</option></select>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close="breedingModalBackdrop">Cancel</button>
+      <button class="btn primary" id="saveBreedingBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="vetModalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3>Add Vet / Medical Log</h3><button class="modal-close" data-close="vetModalBackdrop">×</button></div>
+    <div class="field"><label>Cow</label><select id="vetCowSelect"></select></div>
+    <div class="field-row">
+      <div class="field"><label>Visit date</label><input type="date" id="vetDate"></div>
+      <div class="field"><label>Next follow-up</label><input type="date" id="vetFollowup"></div>
+    </div>
+    <div class="field"><label>Diagnosis</label><input id="vetDiagnosis"></div>
+    <div class="field"><label>Medication given</label><input id="vetMedication"></div>
+    <div class="field"><label>Sick bay isolation?</label><select id="vetIsolation"><option value="no">No</option><option value="yes">Yes</option></select></div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close="vetModalBackdrop">Cancel</button>
+      <button class="btn primary" id="saveVetLogBtn">Save log</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="healthUpdateBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3 id="healthUpdateTitle">Update schedule</h3><button class="modal-close" data-close="healthUpdateBackdrop">×</button></div>
+    <input type="hidden" id="healthUpdateCowId"><input type="hidden" id="healthUpdateField">
+    <div class="field"><label id="healthUpdateLabel">Date performed</label><input type="date" id="healthUpdateDate"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close="healthUpdateBackdrop">Cancel</button>
+      <button class="btn primary" id="saveHealthUpdateBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="vaccineModalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3>Record vaccination</h3><button class="modal-close" data-close="vaccineModalBackdrop">×</button></div>
+    <input type="hidden" id="vaccineCowId"><input type="hidden" id="vaccineType">
+    <div class="field"><label>Cow / Vaccine</label><div id="vaccineLabel" style="font-weight:700;"></div></div>
+    <div class="field"><label>Date given</label><input type="date" id="vaccineDate"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close="vaccineModalBackdrop">Cancel</button>
+      <button class="btn primary" id="saveVaccineBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="feedModalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3>Add stock item</h3><button class="modal-close" data-close="feedModalBackdrop">×</button></div>
+    <div class="field"><label>Item name</label><input id="feedName" placeholder="e.g. Green Fodder (Napier)"></div>
+    <div class="field-row">
+      <div class="field"><label>Current stock</label><input type="number" id="feedStock" min="0" step="0.1"></div>
+      <div class="field"><label>Unit</label><select id="feedUnit"><option>kg</option><option>quintal</option><option>bundle</option></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Daily consumption</label><input type="number" id="feedDaily" min="0" step="0.1"></div>
+      <div class="field"><label>Low stock threshold</label><input type="number" id="feedThreshold" min="0" step="0.1"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close="feedModalBackdrop">Cancel</button>
+      <button class="btn primary" id="saveFeedBtn">Save item</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="ledgerModalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3>Add ledger entry</h3><button class="modal-close" data-close="ledgerModalBackdrop">×</button></div>
+    <div class="field"><label>Type</label><select id="ledgerType"><option value="income">Income</option><option value="expense">Expense</option></select></div>
+    <div class="field"><label>Category</label>
+      <select id="ledgerCategory">
+        <option>Milk Sales</option><option>Compost / Gobar Sales</option><option>Feed</option><option>Medicine</option><option>Labour</option><option>Maintenance</option><option>Other</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Date</label><input type="date" id="ledgerDate"></div>
+      <div class="field"><label>Amount (₹)</label><input type="number" id="ledgerAmount" min="0" step="1"></div>
+    </div>
+    <div class="field"><label>Note</label><input id="ledgerNote"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close="ledgerModalBackdrop">Cancel</button>
+      <button class="btn primary" id="saveLedgerBtn">Save entry</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* ======================================================================
+   GAU-SANCHALAN — Gaushala Management System
+   localStorage (instant/offline cache) + Firebase Realtime Database (sync)
+   ====================================================================== */
+
+/* ---------- Firebase setup ----------
+   Data is stored under the "/gaushalaDB" node of your Realtime Database.
+   NOTE: your Firebase project's Realtime Database rules must allow
+   read/write (e.g. test-mode rules, or your own auth rules) or every
+   device will silently fall back to browser-only storage. */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-analytics.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB4SZAFtG5FGdXkfWaKhvaw6r7UFfmcekw",
+  authDomain: "gaushala-managment.firebaseapp.com",
+  databaseURL: "https://gaushala-managment-default-rtdb.firebaseio.com",
+  projectId: "gaushala-managment",
+  storageBucket: "gaushala-managment.firebasestorage.app",
+  messagingSenderId: "204886706588",
+  appId: "1:204886706588:web:102c6b87a40771c85a2059",
+  measurementId: "G-72D440YMX5"
+};
+
+let fbDbRef = null;
+let firebaseAvailable = false;
+let suppressNextRemoteRender = false;
+
+try {
+  const fbApp = initializeApp(firebaseConfig);
+  try { getAnalytics(fbApp); } catch(e){ /* analytics is optional, ignore if blocked */ }
+  const fbDatabase = getDatabase(fbApp);
+  fbDbRef = ref(fbDatabase, 'gaushalaDB');
+  firebaseAvailable = true;
+} catch(e){
+  console.warn('Firebase init failed, running on local storage only:', e);
+}
+
+function setSyncStatus(state, label){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  el.className = 'sync-status ' + state;
+  el.innerHTML = `<span class="sync-dot"></span> ${label}`;
+}
+
+function normalizeDB(d){
+  return {
+    cows: d.cows || [], milkRecords: d.milkRecords || [], distribution: d.distribution || [],
+    ledger: d.ledger || [], feedItems: d.feedItems || [], vetLogs: d.vetLogs || [],
+    hygieneLogs: d.hygieneLogs || [], compostLogs: d.compostLogs || [], checklists: d.checklists || {},
+  };
+}
+
+function pushToCloud(){
+  if(!firebaseAvailable) return;
+  suppressNextRemoteRender = true;
+  set(fbDbRef, DB).then(()=>{
+    setSyncStatus('online', 'Synced to cloud');
+  }).catch(err=>{
+    console.warn('Cloud sync failed:', err);
+    setSyncStatus('error', 'Sync error — saved locally only');
+  });
+}
+
+function initCloudSync(){
+  if(!firebaseAvailable){ setSyncStatus('offline', 'Local device only'); return; }
+  setSyncStatus('offline', 'Connecting…');
+  get(fbDbRef).then(snapshot=>{
+    if(snapshot.exists()){
+      DB = normalizeDB(snapshot.val());
+      localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+      renderAll();
+    } else {
+      set(fbDbRef, DB); // first run: seed the cloud with local/demo data
+    }
+    setSyncStatus('online', 'Synced to cloud');
+    listenForRemoteChanges();
+  }).catch(err=>{
+    console.warn('Could not reach Firebase:', err);
+    setSyncStatus('error', 'Offline — using local data');
+  });
+}
+
+function listenForRemoteChanges(){
+  onValue(fbDbRef, snapshot=>{
+    if(suppressNextRemoteRender){ suppressNextRemoteRender = false; return; }
+    if(!snapshot.exists()) return;
+    DB = normalizeDB(snapshot.val());
+    localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+    renderAll();
+    setSyncStatus('online', 'Synced to cloud');
+  }, err=>{
+    console.warn('Realtime listener error:', err);
+    setSyncStatus('error', 'Sync error — check database rules');
+  });
+}
+
+const STORE_KEY = 'gauSanchalanDB_v1';
+const todayISO = () => new Date().toISOString().slice(0,10);
+const uid = (p='id') => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+function addDays(dateStr, n){ const d = new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function addMonths(dateStr, n){ const d = new Date(dateStr+'T00:00:00'); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
+function daysBetween(a,b){ const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00'); return Math.round((d2-d1)/86400000); }
+function monthsBetween(a,b){ const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00'); return (d2.getFullYear()-d1.getFullYear())*12 + (d2.getMonth()-d1.getMonth()); }
+function fmtDate(d){ if(!d) return '—'; const dt = new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtMoney(n){ return '₹' + Number(n||0).toLocaleString('en-IN'); }
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function seedData(){
+  const today = todayISO();
+  const cows = [
+    {id:uid('c'), tagId:'TAG-101', name:'Kamdhenu', breed:'Gir', dob:addMonths(today,-48), gender:'female', milkingStatus:'milking', status:'Active', avatar:'🐄', notes:'',
+      breeding:{aiDate:addDays(today,-160), semenBull:'Gir-Bull-04', pdStatus:'Confirmed Positive'},
+      health:{lastDeworm:addDays(today,-70), lastTickSpray:addDays(today,-40), vaccines:{FMD:addDays(today,-150),HS:addDays(today,-200),BQ:addDays(today,-280),Lumpy:addDays(today,-300)}}},
+    {id:uid('c'), tagId:'TAG-102', name:'Nandini', breed:'Sahiwal', dob:addMonths(today,-36), gender:'female', milkingStatus:'milking', status:'Active', avatar:'🐮', notes:'',
+      breeding:{}, health:{lastDeworm:addDays(today,-140), lastTickSpray:addDays(today,-110), vaccines:{FMD:addDays(today,-190),HS:addDays(today,-30),BQ:addDays(today,-370),Lumpy:addDays(today,-100)}}},
+    {id:uid('c'), tagId:'TAG-103', name:'Gauri', breed:'Gir', dob:addMonths(today,-60), gender:'female', milkingStatus:'dry', status:'Active', avatar:'🐄', notes:'Due to calve soon',
+      breeding:{aiDate:addDays(today,-260), semenBull:'Sahiwal-Bull-02', pdStatus:'Confirmed Positive'},
+      health:{lastDeworm:addDays(today,-10), lastTickSpray:addDays(today,-5), vaccines:{FMD:addDays(today,-20),HS:addDays(today,-40),BQ:addDays(today,-60),Lumpy:addDays(today,-90)}}},
+    {id:uid('c'), tagId:'TAG-104', name:'Shyam Bull', breed:'Gir', dob:addMonths(today,-30), gender:'male', milkingStatus:'not-applicable', status:'Active', avatar:'🐂', notes:'Breeding bull',
+      breeding:{}, health:{lastDeworm:addDays(today,-155), lastTickSpray:addDays(today,-125), vaccines:{}}},
+    {id:uid('c'), tagId:'TAG-105', name:'Chhoti', breed:'Sahiwal', dob:addMonths(today,-8), gender:'female', milkingStatus:'not-applicable', status:'Active', avatar:'🐣', notes:'Growing well',
+      breeding:{}, health:{lastDeworm:addDays(today,-20), lastTickSpray:addDays(today,-15), vaccines:{}}},
+    {id:uid('c'), tagId:'TAG-106', name:'—', breed:'Gir', dob:addMonths(today,-2), gender:'male', milkingStatus:'not-applicable', status:'Active', avatar:'🐣', notes:'Newborn calf',
+      breeding:{}, health:{lastDeworm:'', lastTickSpray:'', vaccines:{}}},
+    {id:uid('c'), tagId:'TAG-107', name:'Radha', breed:'Sahiwal', dob:addMonths(today,-52), gender:'female', milkingStatus:'milking', status:'Sick', avatar:'🐮', notes:'Mild fever, under vet observation',
+      breeding:{}, health:{lastDeworm:addDays(today,-95), lastTickSpray:addDays(today,-100), vaccines:{FMD:addDays(today,-175),HS:addDays(today,-10),BQ:addDays(today,-380),Lumpy:addDays(today,-370)}}},
+  ];
+  const milkRecords = [];
+  for(let i=13;i>=0;i--){
+    const d = addDays(today, -i);
+    cows.filter(c=>c.milkingStatus==='milking').forEach(c=>{
+      const base = c.tagId==='TAG-101'?9:7;
+      milkRecords.push({id:uid('m'), cowId:c.id, date:d, morning:+(base*0.55 + Math.random()*0.6).toFixed(1), evening:+(base*0.45+Math.random()*0.5).toFixed(1)});
+    });
+  }
+  const distribution = [];
+  for(let i=6;i>=0;i--){
+    const d = addDays(today,-i);
+    distribution.push({date:d, sales:14, calf:2.5, internal:1.5});
+  }
+  const ledger = [
+    {id:uid('l'), date:addDays(today,-3), type:'income', category:'Milk Sales', amount:4200, note:'Weekly milk sale to dairy'},
+    {id:uid('l'), date:addDays(today,-3), type:'expense', category:'Feed', amount:1800, note:'Bhusa & concentrate purchase'},
+    {id:uid('l'), date:addDays(today,-1), type:'expense', category:'Medicine', amount:650, note:'Vet visit + medication'},
+    {id:uid('l'), date:today, type:'income', category:'Compost / Gobar Sales', amount:900, note:'Vermicompost sale'},
+  ];
+  const feedItems = [
+    {id:uid('f'), name:'Green Fodder (Napier/Bajra)', stock:850, unit:'kg', daily:180, threshold:200},
+    {id:uid('f'), name:'Dry Fodder (Bhusa)', stock:320, unit:'kg', daily:70, threshold:150},
+    {id:uid('f'), name:'Concentrate (Khali/Mix)', stock:95, unit:'kg', daily:35, threshold:100},
+  ];
+  const hygieneLogs = [{id:uid('h'), date:addDays(today,-2), type:'Phenyle Spray', note:'Full shed'}];
+  const compostLogs = [{id:uid('cp'), date:addDays(today,-4), type:'Vermicompost', qty:40, unit:'kg'}];
+  const checklists = {};
+  return {cows, milkRecords, distribution, ledger, feedItems, vetLogs:[], hygieneLogs, compostLogs, checklists};
+}
+
+let DB = load();
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  const seeded = seedData();
+  localStorage.setItem(STORE_KEY, JSON.stringify(seeded));
+  return seeded;
+}
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); pushToCloud(); }
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+/* ---------- Derived cow logic ---------- */
+function getCow(id){ return DB.cows.find(c=>c.id===id); }
+
+function ageMonths(cow){ return monthsBetween(cow.dob, todayISO()); }
+
+function getCategory(cow){
+  const am = ageMonths(cow);
+  if(cow.gender==='male'){
+    return am < 12 ? 'Male Calf' : 'Bull';
+  } else {
+    if(am < 12) return 'Calf';
+    if(am < 24 && cow.milkingStatus==='not-applicable') return 'Heifer';
+    return cow.milkingStatus==='dry' ? 'Dry Cow' : (cow.milkingStatus==='milking' ? 'Milking Cow' : 'Heifer');
+  }
+}
+
+function getEDD(cow){
+  if(cow.breeding && cow.breeding.aiDate) return addDays(cow.breeding.aiDate, 283);
+  return null;
+}
+function getDryAlertDate(cow){
+  const edd = getEDD(cow);
+  return edd ? addDays(edd, -60) : null;
+}
+function getCountdown(cow){
+  const edd = getEDD(cow);
+  if(!edd) return null;
+  return daysBetween(todayISO(), edd);
+}
+
+function getNextDeworm(cow){ return cow.health && cow.health.lastDeworm ? addMonths(cow.health.lastDeworm, 5) : null; }
+function getNextTickSpray(cow){ return cow.health && cow.health.lastTickSpray ? addMonths(cow.health.lastTickSpray, 4) : null; }
+
+const VACCINE_INTERVALS = {FMD:182, HS:365, BQ:365, Lumpy:365};
+const VACCINE_LABELS = {FMD:'FMD (Khurpaka-Munhpaka)', HS:'HS (Galghontu)', BQ:'BQ (Black Quarter)', Lumpy:'Lumpy Skin Disease'};
+function getNextVaccineDue(cow, type){
+  const last = cow.health && cow.health.vaccines ? cow.health.vaccines[type] : null;
+  if(!last) return null;
+  return addDays(last, VACCINE_INTERVALS[type]);
+}
+
+function statusBadgeClass(status){ return (status||'active').toLowerCase(); }
+
+/* ---------- Alerts engine ---------- */
+function computeAlerts(){
+  const alerts = [];
+  const today = todayISO();
+  DB.cows.forEach(cow=>{
+    if(cow.status==='Sold'||cow.status==='Deceased') return;
+    // pregnancy due
+    const countdown = getCountdown(cow);
+    if(countdown!==null){
+      if(countdown<=15 && countdown>=0) alerts.push({level: countdown<=5?'urgent':'soon', text:`${cow.name!=='—'?cow.name:cow.tagId} (${cow.tagId}) is due to calve in ${countdown} day(s)`, tag:'Pregnancy'});
+      else if(countdown<0) alerts.push({level:'urgent', text:`${cow.tagId} — expected delivery date has passed (${Math.abs(countdown)}d overdue). Verify status.`, tag:'Pregnancy'});
+    }
+    const dryAlert = getDryAlertDate(cow);
+    if(dryAlert && cow.milkingStatus==='milking'){
+      const d = daysBetween(today, dryAlert);
+      if(d<=7 && d>=0) alerts.push({level: d<=2?'urgent':'soon', text:`${cow.tagId} should be dried off in ${d} day(s) (60 days before EDD)`, tag:'Dry-off'});
+      else if(d<0) alerts.push({level:'urgent', text:`${cow.tagId} is past its dry-off date — stop milking`, tag:'Dry-off'});
+    }
+    // deworm
+    const nd = getNextDeworm(cow);
+    if(nd){ const d = daysBetween(today, nd); if(d<=3) alerts.push({level: d<0?'urgent':(d===0?'urgent':'soon'), text:`${cow.tagId} deworming ${d<0?'overdue by '+Math.abs(d)+'d':(d===0?'due today':'due in '+d+'d')}`, tag:'Deworm'}); }
+    // tick spray
+    const nt = getNextTickSpray(cow);
+    if(nt){ const d = daysBetween(today, nt); if(d<=3) alerts.push({level: d<0?'urgent':(d===0?'urgent':'soon'), text:`${cow.tagId} tick/chichdi spray ${d<0?'overdue by '+Math.abs(d)+'d':(d===0?'due today':'due in '+d+'d')}`, tag:'Tick Spray'}); }
+    // vaccines
+    Object.keys(VACCINE_INTERVALS).forEach(v=>{
+      const due = getNextVaccineDue(cow, v);
+      if(due){ const d = daysBetween(today, due); if(d<=7) alerts.push({level: d<0?'urgent':(d<=2?'urgent':'soon'), text:`${cow.tagId} — ${VACCINE_LABELS[v]} ${d<0?'overdue':( d===0?'due today':'due in '+d+'d')}`, tag:'Vaccine'}); }
+    });
+    if(cow.status==='Sick') alerts.push({level:'info', text:`${cow.tagId} is flagged Sick — check vet log`, tag:'Health'});
+    if(cow.status==='Isolated') alerts.push({level:'info', text:`${cow.tagId} is in isolation`, tag:'Health'});
+  });
+  DB.feedItems.forEach(f=>{
+    const days = f.daily>0 ? Math.floor(f.stock/f.daily) : Infinity;
+    if(f.stock<=f.threshold || days<=5) alerts.push({level: days<=2?'urgent':'soon', text:`${f.name} stock low — ~${days===Infinity?'∞':days} day(s) of supply left`, tag:'Feed Stock'});
+  });
+  const order = {urgent:0, soon:1, info:2};
+  alerts.sort((a,b)=>order[a.level]-order[b.level]);
+  return alerts;
+}
+
+/* ======================= NAVIGATION ======================= */
+const VIEW_TITLES = {
+  dashboard:['Dashboard',"Herd overview · today's snapshot"],
+  cows:['Cow Profiles & Categorization','Identity, life-stage & status'],
+  breeding:['Pregnancy & Breeding Tracker','Automated EDD & dry-date calculations'],
+  health:['Health, Vaccination & Deworming','Recurring schedules and vet log'],
+  feed:['Smart Feed & Fodder Management','Ration plans & stock forecasting'],
+  milk:['Daily Milk Production & Finance','Yield tracking and ledger'],
+  ops:['Daily Operations & Shed Hygiene','Checklists and compost tracking'],
+  settings:['Data & Backup','Export, import and reset'],
+};
+function switchView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
+  document.getElementById('viewTitle').textContent = VIEW_TITLES[name][0];
+  document.getElementById('viewSub').textContent = VIEW_TITLES[name][1];
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('scrim').classList.remove('show');
+  renderAll();
+}
+document.getElementById('nav').addEventListener('click', e=>{
+  const item = e.target.closest('.nav-item');
+  if(item) switchView(item.dataset.view);
+});
+document.getElementById('hamburgerBtn').addEventListener('click', ()=>{
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('scrim').classList.add('show');
+});
+document.getElementById('scrim').addEventListener('click', ()=>{
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('scrim').classList.remove('show');
+});
+
+document.querySelectorAll('.tabs').forEach(tabBar=>{
+  tabBar.addEventListener('click', e=>{
+    const btn = e.target.closest('.tab-btn');
+    if(!btn) return;
+    tabBar.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const panelSet = tabBar.parentElement;
+    panelSet.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click', ()=>closeModal(b.dataset.close)));
+document.querySelectorAll('.modal-backdrop').forEach(bd=>bd.addEventListener('click', e=>{ if(e.target===bd) bd.classList.remove('show'); }));
+
+/* ======================= CLOCK ======================= */
+function tickClock(){
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short'}) + ' · ' + now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+}
+tickClock(); setInterval(tickClock, 30000);
+
+/* ======================= DASHBOARD ======================= */
+let compChart, milkChart, lactChart;
+function renderDashboard(){
+  const cows = DB.cows;
+  const active = cows.filter(c=>c.status!=='Sold'&&c.status!=='Deceased');
+  const males = active.filter(c=>c.gender==='male').length;
+  const females = active.filter(c=>c.gender==='female').length;
+  const milking = active.filter(c=>c.milkingStatus==='milking').length;
+  const pregnant = active.filter(c=>c.breeding && c.breeding.pdStatus==='Confirmed Positive' && getCountdown(c)!==null && getCountdown(c)>=0).length;
+  const today = todayISO();
+  const todaysMilk = DB.milkRecords.filter(m=>m.date===today).reduce((s,m)=>s+Number(m.morning||0)+Number(m.evening||0),0);
+  const alerts = computeAlerts();
+  const urgentCount = alerts.filter(a=>a.level==='urgent').length;
+
+  const kpis = [
+    {lbl:'Total Cattle', num:active.length, hi:`${cows.length-active.length} sold/deceased`, warn:false},
+    {lbl:'Males', num:males, hi:'Bulls & male calves', warn:false},
+    {lbl:'Females', num:females, hi:'Cows, heifers & calves', warn:false},
+    {lbl:'Milking Cows', num:milking, hi:'Currently in milk', warn:false},
+    {lbl:'Pregnant Cows', num:pregnant, hi:'PD confirmed positive', warn:false},
+    {lbl:'Milk Today (L)', num:todaysMilk.toFixed(1), hi:'Morning + evening', warn:false},
+    {lbl:'Urgent Alerts', num:urgentCount, hi:`${alerts.length} total flagged`, warn:urgentCount>0},
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k=>`
+    <div class="kpi-card ${k.warn?'warn':''}">
+      <div class="lbl">${k.lbl}</div>
+      <div class="num">${k.num}</div>
+      <div class="hi">${k.hi}</div>
+    </div>`).join('');
+
+  const alertList = document.getElementById('alertList');
+  if(alerts.length===0){
+    alertList.innerHTML = `<div class="empty-note">All clear — no vaccinations, deworming, dry-offs or stock issues due right now.</div>`;
+  } else {
+    alertList.innerHTML = alerts.slice(0,12).map(a=>`
+      <div class="alert-row ${a.level}"><span class="dot"></span> ${esc(a.text)} <span class="tag">${a.tag}</span></div>
+    `).join('');
+  }
+
+  // Composition chart
+  const catCounts = {};
+  active.forEach(c=>{ const cat=getCategory(c); catCounts[cat]=(catCounts[cat]||0)+1; });
+  const ctx1 = document.getElementById('compositionChart');
+  if(compChart) compChart.destroy();
+  compChart = new Chart(ctx1, {
+    type:'doughnut',
+    data:{ labels:Object.keys(catCounts), datasets:[{data:Object.values(catCounts), backgroundColor:['#2F5233','#E8A33D','#3D6B8A','#C1502E','#5C8449','#8B9A8C'], borderWidth:2, borderColor:'#fff'}] },
+    options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}}, cutout:'62%' }
+  });
+
+  // Milk trend chart (14 days)
+  const days = []; for(let i=13;i>=0;i--) days.push(addDays(today,-i));
+  const totals = days.map(d=> DB.milkRecords.filter(m=>m.date===d).reduce((s,m)=>s+Number(m.morning||0)+Number(m.evening||0),0));
+  const ctx2 = document.getElementById('milkTrendChart');
+  if(milkChart) milkChart.destroy();
+  milkChart = new Chart(ctx2, {
+    type:'line',
+    data:{ labels:days.map(d=>fmtDate(d).slice(0,6)), datasets:[{label:'Total Litres', data:totals, borderColor:'#2F5233', backgroundColor:'rgba(47,82,51,.12)', fill:true, tension:.35, pointRadius:2}] },
+    options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
+}
+
+/* ======================= COWS ======================= */
+function ringGradient(cow){
+  // signature life-stage progress ring: color encodes nearest-event urgency
+  let nearest = Infinity, color = '#5C8449';
+  const events = [getDryAlertDate(cow), getEDD(cow), getNextDeworm(cow), getNextTickSpray(cow)];
+  events.forEach(e=>{ if(e){ const d = daysBetween(todayISO(), e); if(Math.abs(d) < Math.abs(nearest)) nearest = d; } });
+  if(nearest===Infinity) return `conic-gradient(var(--success) 0deg 360deg)`;
+  if(nearest<=2) color='var(--danger)'; else if(nearest<=10) color='var(--warning)'; else color='var(--success)';
+  const pct = Math.max(0, Math.min(100, 100 - Math.abs(nearest)));
+  return `conic-gradient(${color} 0deg ${pct*3.6}deg, var(--line) ${pct*3.6}deg 360deg)`;
+}
+
+function renderCows(){
+  const catFilter = document.getElementById('filterCategory').value;
+  const statusFilter = document.getElementById('filterStatus').value;
+  const pregFilter = document.getElementById('filterPregMonth').value;
+  const q = (document.getElementById('cowSearchBox').value||'').toLowerCase();
+
+  let list = DB.cows.filter(c=>{
+    if(catFilter && getCategory(c)!==catFilter) return false;
+    if(statusFilter && c.status!==statusFilter) return false;
+    if(q && !(c.tagId.toLowerCase().includes(q) || (c.name||'').toLowerCase().includes(q))) return false;
+    if(pregFilter){
+      const edd = getEDD(c);
+      if(!edd) return false;
+      const monthsPregnant = 9 - Math.ceil(daysBetween(todayISO(), edd)/30);
+      if(pregFilter==='1' && !(monthsPregnant>=1 && monthsPregnant<=3)) return false;
+      if(pregFilter==='2' && !(monthsPregnant>=4 && monthsPregnant<=6)) return false;
+      if(pregFilter==='3' && !(monthsPregnant>=7)) return false;
+    }
+    return true;
+  });
+
+  const grid = document.getElementById('cowGrid');
+  if(list.length===0){ grid.innerHTML = `<div class="empty-note">No cows match these filters.</div>`; return; }
+  grid.innerHTML = list.map(c=>{
+    const cat = getCategory(c);
+    const countdown = getCountdown(c);
+    return `
+    <div class="cow-card" data-id="${c.id}">
+      <div class="cow-card-top">
+        <div class="ring" style="background:${ringGradient(c)}"><div class="hole">${c.avatar||'🐄'}</div></div>
+        <div>
+          <div class="name">${esc(c.name && c.name!=='—' ? c.name : c.tagId)}</div>
+          <div class="tag">${esc(c.tagId)} · ${esc(c.breed||'—')}</div>
+        </div>
+      </div>
+      <div class="meta">
+        <span>Age: ${Math.max(0,ageMonths(c))} months</span>
+        ${countdown!==null && countdown>=0 ? `<span>🤰 Due in ${countdown} days</span>` : ''}
+      </div>
+      <div class="badges-row">
+        <span class="cat-chip">${cat}</span>
+        <span class="badge ${statusBadgeClass(c.status)}">${c.status}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+document.getElementById('cowGrid').addEventListener('click', e=>{
+  const card = e.target.closest('.cow-card');
+  if(card) openCowDetail(card.dataset.id);
+});
+['filterCategory','filterStatus','filterPregMonth','cowSearchBox'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', renderCows);
+});
+document.getElementById('clearFilters').addEventListener('click', ()=>{
+  document.getElementById('filterCategory').value='';
+  document.getElementById('filterStatus').value='';
+  document.getElementById('filterPregMonth').value='';
+  document.getElementById('cowSearchBox').value='';
+  renderCows();
+});
+document.getElementById('globalSearch').addEventListener('input', e=>{
+  document.getElementById('cowSearchBox').value = e.target.value;
+  switchView('cows');
+});
+
+/* Cow add/edit modal */
+function resetCowForm(){
+  document.getElementById('cowId').value='';
+  document.getElementById('cowTagId').value='';
+  document.getElementById('cowName').value='';
+  document.getElementById('cowBreed').value='';
+  document.getElementById('cowDob').value='';
+  document.getElementById('cowGender').value='female';
+  document.getElementById('cowMilkingStatus').value='not-applicable';
+  document.getElementById('cowStatus').value='Active';
+  document.getElementById('cowNotes').value='';
+  document.querySelectorAll('#avatarPicker .pill').forEach(p=>p.classList.remove('active'));
+  document.querySelector('#avatarPicker .pill').classList.add('active');
+}
+document.getElementById('avatarPicker').addEventListener('click', e=>{
+  const pill = e.target.closest('.pill'); if(!pill) return;
+  document.querySelectorAll('#avatarPicker .pill').forEach(p=>p.classList.remove('active'));
+  pill.classList.add('active');
+});
+function openAddCow(){
+  resetCowForm();
+  document.getElementById('cowModalTitle').textContent = 'Add Cow';
+  openModal('cowModalBackdrop');
+}
+document.getElementById('quickAddCow').addEventListener('click', openAddCow);
+document.getElementById('addCowBtn2').addEventListener('click', openAddCow);
+
+document.getElementById('saveCowBtn').addEventListener('click', ()=>{
+  const id = document.getElementById('cowId').value;
+  const tagId = document.getElementById('cowTagId').value.trim();
+  const dob = document.getElementById('cowDob').value;
+  if(!tagId || !dob){ toast('Tag ID and Date of Birth are required'); return; }
+  const avatar = document.querySelector('#avatarPicker .pill.active')?.dataset.emoji || '🐄';
+  const data = {
+    tagId, name: document.getElementById('cowName').value.trim() || '—',
+    breed: document.getElementById('cowBreed').value.trim(),
+    dob, gender: document.getElementById('cowGender').value,
+    milkingStatus: document.getElementById('cowMilkingStatus').value,
+    status: document.getElementById('cowStatus').value,
+    notes: document.getElementById('cowNotes').value.trim(),
+    avatar
+  };
+  if(id){
+    const cow = getCow(id);
+    Object.assign(cow, data);
+    toast('Cow profile updated');
+  } else {
+    DB.cows.push({id:uid('c'), ...data, breeding:{}, health:{lastDeworm:'', lastTickSpray:'', vaccines:{}}});
+    toast('Cow added');
+  }
+  save(); closeModal('cowModalBackdrop'); renderAll();
+});
+
+let currentDetailCowId = null;
+function openCowDetail(id){
+  currentDetailCowId = id;
+  const c = getCow(id);
+  document.getElementById('cowDetailTitle').textContent = `${c.tagId} — ${c.name!=='—'?c.name:'Unnamed'}`;
+  const edd = getEDD(c), countdown = getCountdown(c), dryAlert = getDryAlertDate(c);
+  const nd = getNextDeworm(c), nt = getNextTickSpray(c);
+  document.getElementById('cowDetailBody').innerHTML = `
+    <div class="field-row" style="margin-bottom:6px;">
+      <div><span class="cat-chip">${getCategory(c)}</span> <span class="badge ${statusBadgeClass(c.status)}">${c.status}</span></div>
+    </div>
+    <div class="field-row">
+      <div><b>Breed:</b> ${esc(c.breed||'—')}</div>
+      <div><b>DOB:</b> ${fmtDate(c.dob)} (${ageMonths(c)} mo)</div>
+    </div>
+    <div class="field-row" style="margin-top:8px;">
+      <div><b>Gender:</b> ${c.gender}</div>
+      <div><b>Milking status:</b> ${c.milkingStatus}</div>
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);">
+      <h4 style="font-size:14px;margin-bottom:8px;">Breeding</h4>
+      ${c.breeding && c.breeding.aiDate ? `
+        <div>AI Date: ${fmtDate(c.breeding.aiDate)} · Semen: ${esc(c.breeding.semenBull||'—')}</div>
+        <div>PD Status: ${c.breeding.pdStatus||'Pending'}</div>
+        <div>Expected Delivery: <b>${fmtDate(edd)}</b> ${countdown!==null && countdown>=0 ? `(${countdown} days left)`:''}</div>
+        <div>Dry-off alert: ${fmtDate(dryAlert)}</div>
+      ` : `<div class="empty-note">No breeding record yet.</div>`}
+      <button class="btn sm ghost" style="margin-top:6px;" onclick="openBreedingModalFor('${c.id}')">Update breeding record</button>
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);">
+      <h4 style="font-size:14px;margin-bottom:8px;">Health schedule</h4>
+      <div>Next deworm due: <b>${fmtDate(nd)}</b></div>
+      <div>Next tick/chichdi spray due: <b>${fmtDate(nt)}</b></div>
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);">
+      <h4 style="font-size:14px;margin-bottom:8px;">Notes</h4>
+      <div style="font-size:13px;color:var(--ink-soft);">${esc(c.notes)||'—'}</div>
+    </div>
+  `;
+  openModal('cowDetailBackdrop');
+}
+document.getElementById('editCowFromDetailBtn').addEventListener('click', ()=>{
+  const c = getCow(currentDetailCowId);
+  document.getElementById('cowId').value = c.id;
+  document.getElementById('cowTagId').value = c.tagId;
+  document.getElementById('cowName').value = c.name==='—'?'':c.name;
+  document.getElementById('cowBreed').value = c.breed;
+  document.getElementById('cowDob').value = c.dob;
+  document.getElementById('cowGender').value = c.gender;
+  document.getElementById('cowMilkingStatus').value = c.milkingStatus;
+  document.getElementById('cowStatus').value = c.status;
+  document.getElementById('cowNotes').value = c.notes;
+  document.querySelectorAll('#avatarPicker .pill').forEach(p=>p.classList.toggle('active', p.dataset.emoji===c.avatar));
+  document.getElementById('cowModalTitle').textContent = 'Edit Cow';
+  closeModal('cowDetailBackdrop');
+  openModal('cowModalBackdrop');
+});
+document.getElementById('deleteCowBtn').addEventListener('click', ()=>{
+  if(!confirm('Delete this cow profile and all associated records reference? This cannot be undone.')) return;
+  DB.cows = DB.cows.filter(c=>c.id!==currentDetailCowId);
+  save(); closeModal('cowDetailBackdrop'); renderAll(); toast('Cow removed');
+});
+
+/* ======================= BREEDING ======================= */
+function renderBreeding(){
+  const rows = DB.cows.filter(c=>c.gender==='female' && c.status!=='Sold' && c.status!=='Deceased');
+  document.getElementById('breedingTable').innerHTML = rows.map(c=>{
+    const edd = getEDD(c), countdown = getCountdown(c), dryAlert = getDryAlertDate(c);
+    return `<tr>
+      <td><b>${esc(c.tagId)}</b><br><span style="color:var(--ink-soft);font-size:11.5px;">${esc(c.name)}</span></td>
+      <td>${fmtDate(c.breeding?.aiDate)}</td>
+      <td>${esc(c.breeding?.semenBull||'—')}</td>
+      <td>${c.breeding?.pdStatus ? `<span class="cat-chip">${c.breeding.pdStatus}</span>` : '—'}</td>
+      <td>${fmtDate(edd)}</td>
+      <td>${fmtDate(dryAlert)}</td>
+      <td>${countdown!==null ? (countdown>=0? countdown+'d left' : Math.abs(countdown)+'d overdue') : '—'}</td>
+      <td><button class="btn sm ghost" onclick="openBreedingModalFor('${c.id}')">Update</button></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="8" class="empty-note">No female cows to track.</td></tr>`;
+}
+function openBreedingModalFor(id){
+  const c = getCow(id);
+  document.getElementById('breedingCowId').value = id;
+  document.getElementById('breedingCowLabel').textContent = `${c.tagId} — ${c.name}`;
+  document.getElementById('aiDate').value = c.breeding?.aiDate || '';
+  document.getElementById('semenBull').value = c.breeding?.semenBull || '';
+  document.getElementById('pdStatus').value = c.breeding?.pdStatus || 'Pending';
+  closeModal('cowDetailBackdrop');
+  openModal('breedingModalBackdrop');
+}
+document.getElementById('saveBreedingBtn').addEventListener('click', ()=>{
+  const id = document.getElementById('breedingCowId').value;
+  const c = getCow(id);
+  c.breeding = {
+    aiDate: document.getElementById('aiDate').value,
+    semenBull: document.getElementById('semenBull').value.trim(),
+    pdStatus: document.getElementById('pdStatus').value,
+  };
+  if(c.breeding.pdStatus==='Confirmed Positive') c.milkingStatus = c.milkingStatus==='milking' ? 'milking' : c.milkingStatus;
+  save(); closeModal('breedingModalBackdrop'); toast('Breeding record saved'); renderAll();
+});
+
+/* ======================= HEALTH ======================= */
+function renderHealth(){
+  const active = DB.cows.filter(c=>c.status!=='Sold'&&c.status!=='Deceased');
+  document.getElementById('healthScheduleTable').innerHTML = active.map(c=>{
+    const nd=getNextDeworm(c), nt=getNextTickSpray(c);
+    const ndUrgent = nd && daysBetween(todayISO(),nd)<=3;
+    const ntUrgent = nt && daysBetween(todayISO(),nt)<=3;
+    return `<tr>
+      <td><b>${esc(c.tagId)}</b></td>
+      <td>${fmtDate(c.health?.lastDeworm)}</td>
+      <td>${nd ? `<span class="badge ${ndUrgent?'sick':'active'}">${fmtDate(nd)}</span>` : '—'}</td>
+      <td>${fmtDate(c.health?.lastTickSpray)}</td>
+      <td>${nt ? `<span class="badge ${ntUrgent?'sick':'active'}">${fmtDate(nt)}</span>` : '—'}</td>
+      <td>
+        <button class="btn sm ghost" onclick="openHealthUpdate('${c.id}','lastDeworm','Deworming performed on')">Log deworm</button>
+        <button class="btn sm ghost" onclick="openHealthUpdate('${c.id}','lastTickSpray','Tick/Chichdi spray performed on')">Log spray</button>
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" class="empty-note">No active cows.</td></tr>`;
+
+  let vaccRows = [];
+  active.forEach(c=>{
+    Object.keys(VACCINE_INTERVALS).forEach(v=>{
+      const last = c.health?.vaccines?.[v];
+      const due = getNextVaccineDue(c, v);
+      let statusLabel = 'Not recorded', cls='sold';
+      if(due){
+        const d = daysBetween(todayISO(), due);
+        if(d<0){ statusLabel='Overdue'; cls='sick'; } else if(d<=14){ statusLabel=`Due in ${d}d`; cls='isolated'; } else { statusLabel='On schedule'; cls='active'; }
+      }
+      vaccRows.push(`<tr>
+        <td><b>${esc(c.tagId)}</b></td>
+        <td>${VACCINE_LABELS[v]}</td>
+        <td>${fmtDate(last)}</td>
+        <td>${fmtDate(due)}</td>
+        <td><span class="badge ${cls}">${statusLabel}</span></td>
+        <td><button class="btn sm ghost" onclick="openVaccineModal('${c.id}','${v}')">Record</button></td>
+      </tr>`);
+    });
+  });
+  document.getElementById('vaccineTable').innerHTML = vaccRows.join('') || `<tr><td colspan="6" class="empty-note">No cows.</td></tr>`;
+
+  document.getElementById('vetLogTable').innerHTML = DB.vetLogs.slice().reverse().map(v=>{
+    const c = getCow(v.cowId);
+    return `<tr>
+      <td>${fmtDate(v.date)}</td><td>${c?esc(c.tagId):'—'}</td><td>${esc(v.diagnosis)}</td><td>${esc(v.medication)}</td>
+      <td>${fmtDate(v.followup)}</td><td>${v.isolation==='yes'?'<span class="badge isolated">Isolated</span>':'—'}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" class="empty-note">No vet log entries yet.</td></tr>`;
+
+  const sel = document.getElementById('vetCowSelect');
+  sel.innerHTML = active.map(c=>`<option value="${c.id}">${esc(c.tagId)} — ${esc(c.name)}</option>`).join('');
+}
+function openHealthUpdate(cowId, field, label){
+  document.getElementById('healthUpdateCowId').value = cowId;
+  document.getElementById('healthUpdateField').value = field;
+  document.getElementById('healthUpdateLabel').textContent = label;
+  document.getElementById('healthUpdateDate').value = todayISO();
+  document.getElementById('healthUpdateTitle').textContent = 'Update schedule';
+  openModal('healthUpdateBackdrop');
+}
+document.getElementById('saveHealthUpdateBtn').addEventListener('click', ()=>{
+  const cowId = document.getElementById('healthUpdateCowId').value;
+  const field = document.getElementById('healthUpdateField').value;
+  const date = document.getElementById('healthUpdateDate').value;
+  const c = getCow(cowId);
+  if(!c.health) c.health = {};
+  c.health[field] = date;
+  save(); closeModal('healthUpdateBackdrop'); toast('Schedule updated'); renderAll();
+});
+function openVaccineModal(cowId, type){
+  const c = getCow(cowId);
+  document.getElementById('vaccineCowId').value = cowId;
+  document.getElementById('vaccineType').value = type;
+  document.getElementById('vaccineLabel').textContent = `${c.tagId} — ${VACCINE_LABELS[type]}`;
+  document.getElementById('vaccineDate').value = todayISO();
+  openModal('vaccineModalBackdrop');
+}
+document.getElementById('saveVaccineBtn').addEventListener('click', ()=>{
+  const cowId = document.getElementById('vaccineCowId').value;
+  const type = document.getElementById('vaccineType').value;
+  const date = document.getElementById('vaccineDate').value;
+  const c = getCow(cowId);
+  if(!c.health) c.health = {vaccines:{}};
+  if(!c.health.vaccines) c.health.vaccines = {};
+  c.health.vaccines[type] = date;
+  save(); closeModal('vaccineModalBackdrop'); toast('Vaccination recorded'); renderAll();
+});
+document.getElementById('addVetLogBtn').addEventListener('click', ()=>{
+  document.getElementById('vetDate').value = todayISO();
+  document.getElementById('vetFollowup').value = '';
+  document.getElementById('vetDiagnosis').value = '';
+  document.getElementById('vetMedication').value = '';
+  document.getElementById('vetIsolation').value = 'no';
+  openModal('vetModalBackdrop');
+});
+document.getElementById('saveVetLogBtn').addEventListener('click', ()=>{
+  const cowId = document.getElementById('vetCowSelect').value;
+  const log = {
+    id: uid('v'), cowId, date: document.getElementById('vetDate').value,
+    diagnosis: document.getElementById('vetDiagnosis').value.trim(),
+    medication: document.getElementById('vetMedication').value.trim(),
+    followup: document.getElementById('vetFollowup').value,
+    isolation: document.getElementById('vetIsolation').value,
+  };
+  DB.vetLogs.push(log);
+  if(log.isolation==='yes'){ const c=getCow(cowId); c.status='Isolated'; }
+  save(); closeModal('vetModalBackdrop'); toast('Vet log saved'); renderAll();
+});
+
+/* ======================= FEED ======================= */
+function renderFeed(){
+  document.getElementById('feedGrid').innerHTML = DB.feedItems.map(f=>{
+    const days = f.daily>0 ? Math.floor(f.stock/f.daily) : null;
+    const pct = Math.max(4, Math.min(100, (f.stock / (f.threshold*3||1))*100));
+    const cls = f.stock<=f.threshold ? 'low' : (days!==null && days<=7 ? 'mid' : '');
+    return `<div class="feed-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div><b>${esc(f.name)}</b><div style="font-size:12px;color:var(--ink-soft);">${f.stock} ${f.unit} in stock</div></div>
+        <button class="btn sm ghost" onclick="deleteFeedItem('${f.id}')">✕</button>
+      </div>
+      <div class="stockbar ${cls}"><div style="width:${pct}%"></div></div>
+      <div style="font-size:12px;margin-top:8px;color:var(--ink-soft);">Daily use: ${f.daily} ${f.unit}/day</div>
+      <div style="font-size:12.5px;margin-top:4px;font-weight:700;color:${cls==='low'?'var(--danger)':'var(--ink)'}">
+        ${days===null?'—':(days<=0?'Stock exhausted!':`Runs out in ~${days} days (${fmtDate(addDays(todayISO(),days))})`)}
+      </div>
+      ${f.stock<=f.threshold?`<div class="badge sick" style="margin-top:8px;">Low stock</div>`:''}
+    </div>`;
+  }).join('') || `<div class="empty-note">No stock items yet — add green fodder, dry fodder and concentrate.</div>`;
+}
+window.deleteFeedItem = function(id){
+  DB.feedItems = DB.feedItems.filter(f=>f.id!==id); save(); renderAll(); toast('Item removed');
+};
+document.getElementById('addFeedItemBtn').addEventListener('click', ()=>{
+  document.getElementById('feedName').value='';document.getElementById('feedStock').value='';
+  document.getElementById('feedDaily').value='';document.getElementById('feedThreshold').value='';
+  openModal('feedModalBackdrop');
+});
+document.getElementById('saveFeedBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('feedName').value.trim();
+  if(!name){ toast('Item name required'); return; }
+  DB.feedItems.push({
+    id:uid('f'), name, stock:+document.getElementById('feedStock').value||0, unit:document.getElementById('feedUnit').value,
+    daily:+document.getElementById('feedDaily').value||0, threshold:+document.getElementById('feedThreshold').value||0
+  });
+  save(); closeModal('feedModalBackdrop'); toast('Stock item added'); renderAll();
+});
+
+/* ======================= MILK & FINANCE ======================= */
+function renderMilk(){
+  const dateInput = document.getElementById('milkEntryDate');
+  if(!dateInput.value) dateInput.value = todayISO();
+  const date = dateInput.value;
+  const milkingCows = DB.cows.filter(c=>c.milkingStatus==='milking' && c.status!=='Sold' && c.status!=='Deceased');
+  document.getElementById('milkEntryTable').innerHTML = milkingCows.map(c=>{
+    const rec = DB.milkRecords.find(m=>m.cowId===c.id && m.date===date) || {morning:'',evening:''};
+    return `<tr data-cow="${c.id}">
+      <td><b>${esc(c.tagId)}</b> ${esc(c.name)}</td>
+      <td><input type="number" min="0" step="0.1" class="mMorning" value="${rec.morning}"></td>
+      <td><input type="number" min="0" step="0.1" class="mEvening" value="${rec.evening}"></td>
+      <td class="mTotal">${(Number(rec.morning||0)+Number(rec.evening||0)).toFixed(1)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="4" class="empty-note">No cows currently marked as milking.</td></tr>`;
+
+  document.querySelectorAll('.mMorning, .mEvening').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const row = e.target.closest('tr');
+      const m = +row.querySelector('.mMorning').value||0, ev = +row.querySelector('.mEvening').value||0;
+      row.querySelector('.mTotal').textContent = (m+ev).toFixed(1);
+      const total = [...document.querySelectorAll('#milkEntryTable tr')].reduce((s,r)=>{
+        const mm=+r.querySelector('.mMorning')?.value||0, ee=+r.querySelector('.mEvening')?.value||0; return s+mm+ee;
+      },0);
+      document.getElementById('milkTotalToday').textContent = `Total: ${total.toFixed(1)} L`;
+    });
+  });
+  const total0 = milkingCows.reduce((s,c)=>{
+    const rec = DB.milkRecords.find(m=>m.cowId===c.id && m.date===date);
+    return s + (rec? Number(rec.morning||0)+Number(rec.evening||0):0);
+  },0);
+  document.getElementById('milkTotalToday').textContent = `Total: ${total0.toFixed(1)} L`;
+
+  // lactation select
+  const sel = document.getElementById('lactationCowSelect');
+  const prevVal = sel.value;
+  sel.innerHTML = DB.cows.filter(c=>c.gender==='female').map(c=>`<option value="${c.id}">${esc(c.tagId)} — ${esc(c.name)}</option>`).join('');
+  if(prevVal) sel.value = prevVal;
+  renderLactationChart(sel.value || (DB.cows.find(c=>c.gender==='female')||{}).id);
+
+  // distribution
+  if(!document.getElementById('distDate').value) document.getElementById('distDate').value = todayISO();
+  document.getElementById('distTable').innerHTML = DB.distribution.slice().reverse().slice(0,14).map(d=>{
+    const milked = DB.milkRecords.filter(m=>m.date===d.date).reduce((s,m)=>s+Number(m.morning||0)+Number(m.evening||0),0);
+    return `<tr><td>${fmtDate(d.date)}</td><td>${milked.toFixed(1)} L</td><td>${d.sales} L</td><td>${d.calf} L</td><td>${d.internal} L</td></tr>`;
+  }).join('') || `<tr><td colspan="5" class="empty-note">No distribution logged yet.</td></tr>`;
+
+  // ledger
+  const income = DB.ledger.filter(l=>l.type==='income').reduce((s,l)=>s+Number(l.amount),0);
+  const expense = DB.ledger.filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount),0);
+  document.getElementById('financeKpis').innerHTML = `
+    <div class="kpi-card"><div class="lbl">Total Income</div><div class="num" style="color:var(--success)">${fmtMoney(income)}</div></div>
+    <div class="kpi-card"><div class="lbl">Total Expense</div><div class="num" style="color:var(--danger)">${fmtMoney(expense)}</div></div>
+    <div class="kpi-card"><div class="lbl">Net Balance</div><div class="num">${fmtMoney(income-expense)}</div></div>
+  `;
+  document.getElementById('ledgerTable').innerHTML = DB.ledger.slice().reverse().map(l=>`
+    <tr><td>${fmtDate(l.date)}</td><td><span class="badge ${l.type==='income'?'active':'sick'}">${l.type}</span></td><td>${esc(l.category)}</td><td>${fmtMoney(l.amount)}</td><td>${esc(l.note)}</td>
+    <td><button class="btn sm ghost" onclick="deleteLedger('${l.id}')">✕</button></td></tr>
+  `).join('') || `<tr><td colspan="6" class="empty-note">No ledger entries yet.</td></tr>`;
+}
+document.getElementById('milkEntryDate').addEventListener('change', renderMilk);
+document.getElementById('saveMilkEntryBtn').addEventListener('click', ()=>{
+  const date = document.getElementById('milkEntryDate').value;
+  document.querySelectorAll('#milkEntryTable tr').forEach(row=>{
+    const cowId = row.dataset.cow; if(!cowId) return;
+    const morning = +row.querySelector('.mMorning').value||0, evening = +row.querySelector('.mEvening').value||0;
+    let rec = DB.milkRecords.find(m=>m.cowId===cowId && m.date===date);
+    if(!rec){ rec = {id:uid('m'), cowId, date}; DB.milkRecords.push(rec); }
+    rec.morning = morning; rec.evening = evening;
+  });
+  save(); toast('Milk entries saved'); renderAll();
+});
+function renderLactationChart(cowId){
+  const cow = getCow(cowId);
+  const recs = DB.milkRecords.filter(m=>m.cowId===cowId).sort((a,b)=>a.date.localeCompare(b.date));
+  const ctx = document.getElementById('lactationChart');
+  if(lactChart) lactChart.destroy();
+  lactChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:recs.map(r=>fmtDate(r.date).slice(0,6)), datasets:[
+      {label:'Morning', data:recs.map(r=>r.morning), borderColor:'#E8A33D', backgroundColor:'transparent', tension:.3},
+      {label:'Evening', data:recs.map(r=>r.evening), borderColor:'#3D6B8A', backgroundColor:'transparent', tension:.3},
+      {label:'Total', data:recs.map(r=>Number(r.morning||0)+Number(r.evening||0)), borderColor:'#2F5233', backgroundColor:'rgba(47,82,51,.1)', fill:true, tension:.3},
+    ]},
+    options:{ plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true}} }
+  });
+}
+document.getElementById('lactationCowSelect').addEventListener('change', e=>renderLactationChart(e.target.value));
+document.getElementById('saveDistBtn').addEventListener('click', ()=>{
+  const date = document.getElementById('distDate').value;
+  const entry = { date, sales:+document.getElementById('distSales').value||0, calf:+document.getElementById('distCalf').value||0, internal:+document.getElementById('distInternal').value||0 };
+  const idx = DB.distribution.findIndex(d=>d.date===date);
+  if(idx>=0) DB.distribution[idx]=entry; else DB.distribution.push(entry);
+  save(); toast('Distribution saved'); renderAll();
+});
+document.getElementById('addLedgerBtn').addEventListener('click', ()=>{
+  document.getElementById('ledgerDate').value = todayISO();
+  document.getElementById('ledgerAmount').value='';
+  document.getElementById('ledgerNote').value='';
+  openModal('ledgerModalBackdrop');
+});
+document.getElementById('saveLedgerBtn').addEventListener('click', ()=>{
+  const amount = +document.getElementById('ledgerAmount').value;
+  if(!amount){ toast('Enter an amount'); return; }
+  DB.ledger.push({
+    id:uid('l'), type:document.getElementById('ledgerType').value, category:document.getElementById('ledgerCategory').value,
+    date:document.getElementById('ledgerDate').value, amount, note:document.getElementById('ledgerNote').value.trim()
+  });
+  save(); closeModal('ledgerModalBackdrop'); toast('Ledger entry saved'); renderAll();
+});
+window.deleteLedger = function(id){ DB.ledger = DB.ledger.filter(l=>l.id!==id); save(); renderAll(); };
+
+/* ======================= OPERATIONS ======================= */
+const DEFAULT_TASKS = [
+  'Morning milking (all milking cows)','Evening milking (all milking cows)','Feed green fodder — morning round',
+  'Feed green fodder — evening round','Clean water troughs','Clean shed / remove manure','Check sick-bay isolated cows','Record daily milk entry'
+];
+function renderOps(){
+  const date = todayISO();
+  document.getElementById('opsDateLabel').textContent = fmtDate(date);
+  if(!DB.checklists[date]) DB.checklists[date] = DEFAULT_TASKS.map(()=>false);
+  document.getElementById('checklistBox').innerHTML = DEFAULT_TASKS.map((t,i)=>`
+    <label class="check-row ${DB.checklists[date][i]?'done':''}">
+      <input type="checkbox" data-idx="${i}" ${DB.checklists[date][i]?'checked':''}> ${t}
+    </label>
+  `).join('');
+  document.querySelectorAll('#checklistBox input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', e=>{
+      DB.checklists[date][+e.target.dataset.idx] = e.target.checked;
+      save();
+      e.target.closest('.check-row').classList.toggle('done', e.target.checked);
+    });
+  });
+  if(!document.getElementById('hygieneDate').value) document.getElementById('hygieneDate').value = date;
+  if(!document.getElementById('compostDate').value) document.getElementById('compostDate').value = date;
+  document.getElementById('hygieneTable').innerHTML = DB.hygieneLogs.slice().reverse().map(h=>`
+    <tr><td>${fmtDate(h.date)}</td><td>${esc(h.type)}</td><td>${esc(h.note)}</td></tr>
+  `).join('') || `<tr><td colspan="3" class="empty-note">No hygiene logs yet.</td></tr>`;
+  document.getElementById('compostTable').innerHTML = DB.compostLogs.slice().reverse().map(c=>`
+    <tr><td>${fmtDate(c.date)}</td><td>${esc(c.type)}</td><td>${c.qty} ${esc(c.unit)}</td></tr>
+  `).join('') || `<tr><td colspan="3" class="empty-note">No compost logs yet.</td></tr>`;
+}
+document.getElementById('addHygieneBtn').addEventListener('click', ()=>{
+  DB.hygieneLogs.push({id:uid('h'), date:document.getElementById('hygieneDate').value, type:document.getElementById('hygieneType').value, note:document.getElementById('hygieneNote').value.trim()});
+  save(); toast('Hygiene log added'); renderAll();
+  document.getElementById('hygieneNote').value='';
+});
+document.getElementById('addCompostBtn').addEventListener('click', ()=>{
+  const qty = +document.getElementById('compostQty').value;
+  if(!qty){ toast('Enter a quantity'); return; }
+  DB.compostLogs.push({id:uid('cp'), date:document.getElementById('compostDate').value, type:document.getElementById('compostType').value, qty, unit:document.getElementById('compostUnit').value});
+  save(); toast('Compost log added'); renderAll();
+  document.getElementById('compostQty').value='';
+});
+
+/* ======================= SETTINGS / EXPORT ======================= */
+function downloadFile(filename, content, mime){
+  const blob = new Blob([content], {type:mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function toCSV(rows, headers){
+  const esc2 = v => `"${String(v??'').replace(/"/g,'""')}"`;
+  return [headers.join(','), ...rows.map(r=>headers.map(h=>esc2(r[h])).join(','))].join('\n');
+}
+document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
+  downloadFile(`gaushala-backup-${todayISO()}.json`, JSON.stringify(DB, null, 2), 'application/json');
+  toast('Backup exported');
+});
+document.getElementById('importJsonInput').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const parsed = JSON.parse(ev.target.result);
+      if(!parsed.cows){ toast('Invalid backup file'); return; }
+      DB = parsed; save(); renderAll(); toast('Backup restored');
+    }catch(err){ toast('Could not read file'); }
+  };
+  reader.readAsText(file);
+});
+document.getElementById('exportCowsCsv').addEventListener('click', ()=>{
+  const rows = DB.cows.map(c=>({TagID:c.tagId, Name:c.name, Breed:c.breed, DOB:c.dob, Gender:c.gender, Category:getCategory(c), MilkingStatus:c.milkingStatus, Status:c.status}));
+  downloadFile(`cows-${todayISO()}.csv`, toCSV(rows, ['TagID','Name','Breed','DOB','Gender','Category','MilkingStatus','Status']), 'text/csv');
+});
+document.getElementById('exportMilkCsv').addEventListener('click', ()=>{
+  const rows = DB.milkRecords.map(m=>({Date:m.date, TagID:getCow(m.cowId)?.tagId||m.cowId, Morning:m.morning, Evening:m.evening, Total:(Number(m.morning||0)+Number(m.evening||0)).toFixed(1)}));
+  downloadFile(`milk-records-${todayISO()}.csv`, toCSV(rows, ['Date','TagID','Morning','Evening','Total']), 'text/csv');
+});
+document.getElementById('exportLedgerCsv').addEventListener('click', ()=>{
+  downloadFile(`ledger-${todayISO()}.csv`, toCSV(DB.ledger, ['date','type','category','amount','note']), 'text/csv');
+});
+document.getElementById('resetAllBtn').addEventListener('click', ()=>{
+  if(!confirm('This will erase ALL data in this browser. Continue?')) return;
+  localStorage.removeItem(STORE_KEY);
+  DB = load();
+  renderAll(); toast('All data erased');
+});
+
+/* ======================= INIT ======================= */
+function renderAll(){
+  renderDashboard();
+  renderCows();
+  renderBreeding();
+  renderHealth();
+  renderFeed();
+  renderMilk();
+  renderOps();
+}
+renderAll();
+initCloudSync();
+
+/* Expose functions referenced from inline onclick="" attributes in
+   generated HTML — required because top-level names in a module
+   script are not automatically attached to window. */
+window.openBreedingModalFor = openBreedingModalFor;
+window.openHealthUpdate = openHealthUpdate;
+window.openVaccineModal = openVaccineModal;
+</script>
+</body>
+</html>
