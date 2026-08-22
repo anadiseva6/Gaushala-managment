@@ -12,14 +12,18 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="https://upload-widget.cloudinary.com/global/all.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <style>
     body{background:#f6f8f6}.scrollbar::-webkit-scrollbar{width:7px;height:7px}.scrollbar::-webkit-scrollbar-thumb{background:#cbd5ce;border-radius:20px}
     .nav-active{background:#dcfce7;color:#14532d;font-weight:700}.card{background:white;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 2px 8px rgba(16,24,16,.035)}
     .input{width:100%;border:1px solid #d7ded9;border-radius:10px;padding:.62rem .75rem;outline:none;background:white}.input:focus{border-color:#65a30d;box-shadow:0 0 0 3px #ecfccb}
-    .btn{border-radius:10px;padding:.62rem .9rem;font-weight:700;display:inline-flex;align-items:center;gap:.45rem}.btn-primary{background:#166534;color:white}.btn-primary:hover{background:#14532d}.btn-soft{background:#eef5ef;color:#245234}.btn-danger{background:#fee2e2;color:#991b1b}
+    .btn{border-radius:10px;padding:.62rem .9rem;font-weight:700;display:inline-flex;align-items:center;gap:.45rem;cursor:pointer;border:none}.btn:disabled{opacity:.55;cursor:not-allowed}.btn-primary{background:#166534;color:white}.btn-primary:hover{background:#14532d}.btn-soft{background:#eef5ef;color:#245234}.btn-soft:hover{background:#e1ede2}.btn-danger{background:#fee2e2;color:#991b1b}.btn-danger:hover{background:#fecaca}
     .badge{font-size:.72rem;font-weight:700;border-radius:999px;padding:.25rem .55rem;display:inline-block}.toast{animation:in .2s ease}@keyframes in{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
     .modal-bg{background:rgba(4,15,8,.48)}.hide-scroll::-webkit-scrollbar{display:none}
+    .spinner{width:14px;height:14px;border:2px solid #ffffff55;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}@keyframes spin{to{transform:rotate(360deg)}}
+    details.info summary{list-style:none;cursor:pointer}details.info summary::-webkit-details-marker{display:none}details.info summary::marker{content:""}
+    details.info[open] summary{background:#cbd5ce}
   </style>
 </head>
 <body class="text-slate-800">
@@ -42,8 +46,8 @@ firebase.initializeApp(firebaseConfig);
 const db=firebase.database(), auth=firebase.auth();
 
 const state={
-  page:"Dashboard", data:{}, search:"", modal:null, role:"Owner / Admin",
-  cloud:{name:localStorage.cloudinaryName||"",preset:localStorage.cloudinaryPreset||""}
+  page:"Dashboard", data:{}, search:"", modal:null, role:localStorage.gaushalaRole||"Owner / Admin",
+  cloud:{name:localStorage.cloudinaryName||"lw7coppb",preset:localStorage.cloudinaryPreset||"gaushala_images"}
 };
 const modules={
   Dashboard:["🏠","Dashboard"], Animals:["🐄","Animals"], Pregnancy:["🤰","Pregnancy"], Calves:["🐮","Calves"],
@@ -51,7 +55,32 @@ const modules={
   Vaccination:["💉","Vaccination"], Deworming:["🛡️","Deworming"], "Tick Control":["🪲","Tick Control"],
   Sheds:["🏠","Sheds"], Workers:["👷","Workers"], Tasks:["☑️","Tasks"], Expenses:["₹","Expenses"], Reports:["📊","Reports"], Settings:["⚙️","Settings"]
 };
-const paths=["animals","pregnancies","calvings","milkRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","feedInventory","feedRecords","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications"];
+// Role-based access: null = full access. hiddenModules = module poori tarah nazar nahi aayega.
+// viewOnly = module dikhega par Add/Edit/Delete button hidden rahenge, sirf data dekh sakte hain.
+const ROLE_PERMISSIONS={
+ "Owner / Admin":null,
+ "Manager":{hiddenModules:["Settings"],viewOnly:[]},
+ "Veterinarian":{hiddenModules:["Workers","Expenses","Sheds","Settings"],viewOnly:["Animals"]},
+ "Worker":{hiddenModules:["Pregnancy","Medicines","Vaccination","Deworming","Tick Control","Sheds","Workers","Expenses","Reports","Settings"],viewOnly:["Animals"]}
+};
+const ROLE_DESCRIPTIONS={
+ "Owner / Admin":"Sab kuch dekh aur badal sakte hain — full access, Settings bhi.",
+ "Manager":"Settings ke alawa har module ka full access — animals, milk, feed, health, expenses sab manage kar sakte hain.",
+ "Veterinarian":"Medical modules (Health, Medicines, Vaccination, Deworming, Tick Control, Pregnancy) full access. Workers, Expenses, Sheds aur Settings dikhenge hi nahi. Animal list sirf dekh sakte hain, edit nahi.",
+ "Worker":"Sirf roz ke operational kaam — Tasks, Milk, Feed, Calves, basic Health. Animal list sirf dekh sakte hain. Pregnancy, Medicines, Workers, Expenses, Reports, Settings nahi dikhenge."
+};
+function currentPermissions(){return ROLE_PERMISSIONS[state.role]||null}
+function isModuleHidden(m){const p=currentPermissions();return !!(p&&p.hiddenModules&&p.hiddenModules.includes(m))}
+function isModuleViewOnly(m){const p=currentPermissions();return !!(p&&p.viewOnly&&p.viewOnly.includes(m))}
+function changeRole(r){
+ state.role=r;localStorage.gaushalaRole=r;
+ if(isModuleHidden(state.page)){toast(`${state.role} role ke paas ${state.page} ka access nahi hai`,false);state.page="Dashboard"}
+ renderShell();
+}
+function infoIcon(text){
+ return `<details class="info relative inline-block align-middle ml-2"><summary class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[11px] font-bold grid place-items-center hover:bg-slate-300" title="${esc(text)}">i</summary><div class="absolute z-20 left-0 mt-2 w-72 max-w-[80vw] card p-3 text-xs text-slate-600 shadow-lg font-normal">${esc(text)}</div></details>`
+}
+const paths=["animals","pregnancies","calvings","milkRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","feedInventory","feedRecords","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog"];
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function id(prefix){return prefix+"-"+Math.random().toString(36).slice(2,7).toUpperCase()}
@@ -59,6 +88,7 @@ function today(){return new Date().toISOString().slice(0,10)}
 function addDays(d,n){let x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)}
 function fmt(d){if(!d)return"—";return new Date(d+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}
 function daysTo(d){if(!d)return null;return Math.ceil((new Date(d+"T00:00:00")-new Date(today()+"T00:00:00"))/86400000)}
+function fmtBytes(n){n=Number(n||0);if(n<1024)return n+" B";if(n<1024*1024)return (n/1024).toFixed(1)+" KB";return (n/(1024*1024)).toFixed(2)+" MB"}
 function badge(s){
   let c="bg-slate-100 text-slate-700"; if(["Healthy","Completed","Lactating"].includes(s))c="bg-green-100 text-green-800";
   if(["Pregnant","Under Treatment"].includes(s))c="bg-violet-100 text-violet-800"; if(["Sick","Emergency","Overdue"].includes(s))c="bg-red-100 text-red-800";
@@ -66,7 +96,7 @@ function badge(s){
 }
 function toast(msg,ok=true){document.getElementById("toast").innerHTML=`<div class="toast card px-4 py-3 flex items-center gap-2 ${ok?"text-green-800":"text-red-800"}">${ok?"✓":"⚠"} ${esc(msg)}</div>`;setTimeout(()=>document.getElementById("toast").innerHTML="",3000)}
 async function save(path,key,data){if(!key)key=id(path.slice(0,-1).toUpperCase()||"REC");data.updatedAt=new Date().toISOString();await db.ref(`${path}/${key}`).set({...data,id:key});return key}
-async function remove(path,key){await db.ref(`${path}/${key}`).remove()}
+async function remove(path,key){if(!path){toast("Could not delete: unknown record type",false);return}await db.ref(`${path}/${key}`).remove()}
 function list(path){return Object.values(state.data[path]||{})}
 function animals(){return list("animals")}
 function findAnimal(id){return animals().find(a=>a.id===id)}
@@ -75,8 +105,9 @@ function closeModal(){document.getElementById("modalRoot").innerHTML=""}
 function field(label,name,value="",type="text",extra=""){return `<label class="block text-sm font-semibold text-slate-600">${label}<input ${extra} class="input mt-1" name="${name}" type="${type}" value="${esc(value)}"></label>`}
 function select(label,name,opts,value=""){return `<label class="block text-sm font-semibold text-slate-600">${label}<select class="input mt-1" name="${name}">${opts.map(o=>`<option ${o===value?"selected":""}>${esc(o)}</option>`).join("")}</select></label>`}
 function formGrid(html){return `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${html}</div>`}
+function animalDatalist(){return `<datalist id="animalIds">${animals().map(a=>`<option value="${esc(a.id)}">${esc(a.name||"")}</option>`).join("")}</datalist>`}
 function nav(){
-  return Object.entries(modules).map(([k,[i,l]])=>`<button onclick="go('${k}')" class="w-full text-left px-3 py-2.5 rounded-xl flex gap-3 items-center ${state.page===k?"nav-active":"text-slate-500 hover:bg-slate-100"}">${i}<span>${l}</span></button>`).join("")
+  return Object.entries(modules).filter(([k])=>!isModuleHidden(k)).map(([k,[i,l]])=>`<button onclick="go('${k}')" class="w-full text-left px-3 py-2.5 rounded-xl flex gap-3 items-center ${state.page===k?"nav-active":"text-slate-500 hover:bg-slate-100"}">${i}<span>${l}</span></button>`).join("")
 }
 function renderShell(){
  document.getElementById("app").innerHTML=`<div class="min-h-screen flex">
@@ -87,26 +118,36 @@ function renderShell(){
  <main class="lg:ml-64 min-h-screen w-full">
   <header class="sticky top-0 z-30 h-20 bg-white/95 backdrop-blur border-b px-4 lg:px-8 flex items-center justify-between">
    <div class="flex items-center gap-3"><button class="lg:hidden text-2xl" onclick="toggleSide()">☰</button><div><div class="text-xs text-slate-400">${new Date().toLocaleDateString("en-IN",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div><h1 class="font-bold text-xl">${esc(state.page)}</h1></div></div>
-   <div class="flex items-center gap-2"><div class="hidden md:flex items-center border rounded-xl px-3 bg-slate-50"><span>⌕</span><input class="bg-transparent outline-none p-2 w-56" placeholder="Search..." value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div><select class="input !w-auto !py-2" onchange="state.role=this.value;renderShell()"><option>Owner / Admin</option><option>Manager</option><option>Veterinarian</option><option>Worker</option></select><div class="w-9 h-9 rounded-full bg-green-800 text-white grid place-items-center font-bold">A</div></div>
+   <div class="flex items-center gap-2"><div class="hidden md:flex items-center border rounded-xl px-3 bg-slate-50"><span>⌕</span><input class="bg-transparent outline-none p-2 w-56" placeholder="Search..." value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div><div class="flex items-center">${infoIcon("Role change karne se app ke features us role ke hisaab se badal jaate hain — kuch modules chhup jaate hain ya sirf-dekhne-layak ban jaate hain. Details: "+Object.entries(ROLE_DESCRIPTIONS).map(([r,d])=>r+" — "+d).join("  |  "))}<select class="input !w-auto !py-2 ml-1" onchange="changeRole(this.value)">${["Owner / Admin","Manager","Veterinarian","Worker"].map(r=>`<option ${r===state.role?"selected":""}>${esc(r)}</option>`).join("")}</select></div><div class="w-9 h-9 rounded-full bg-green-800 text-white grid place-items-center font-bold">A</div></div>
   </header>
   <section id="content" class="p-4 lg:p-8 max-w-[1600px] mx-auto"></section>
  </main></div>`;
  renderPage();
 }
-function go(p){state.page=p;state.search="";renderShell()}
+function go(p){
+ if(isModuleHidden(p)){toast(`${state.role} role ke paas ${p} ka access nahi hai`,false);return}
+ state.page=p;state.search="";renderShell()
+}
 function toggleSide(){document.getElementById("side").classList.toggle("-translate-x-full")}
 async function loadAll(){
-  await Promise.all(paths.map(p=>new Promise(res=>db.ref(p).on("value",s=>{state.data[p]=s.val()||{};res()}))));
+  await Promise.all(paths.map(p=>new Promise(res=>{
+   let firstSnapshot=true;
+   db.ref(p).on("value",s=>{
+    state.data[p]=s.val()||{};
+    if(firstSnapshot){firstSnapshot=false;res();}
+    else if(document.getElementById("content")){renderPage();}
+   },err=>{console.error(p,err);if(firstSnapshot){firstSnapshot=false;res()}});
+  })));
   renderShell();
 }
 function stat(title,val,icon){return `<div class="card p-4"><div class="flex justify-between text-sm text-slate-500"><span>${title}</span><span class="w-8 h-8 rounded-lg bg-green-50 grid place-items-center">${icon}</span></div><b class="block text-2xl mt-3">${val}</b></div>`}
-function pageHeader(title,desc,button=""){return `<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6"><div><h2 class="text-2xl font-bold">${title}</h2><p class="text-sm text-slate-500 mt-1">${desc}</p></div>${button}</div>`}
+function pageHeader(title,desc,button="",help=""){return `<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6"><div><h2 class="text-2xl font-bold flex items-center">${title}${help?infoIcon(help):""}</h2><p class="text-sm text-slate-500 mt-1">${desc}</p></div>${button}</div>`}
 function dashboard(){
  const a=animals(), preg=a.filter(x=>x.pregnant||x.status==="Pregnant"), sick=a.filter(x=>["Sick","Emergency","Under Treatment"].includes(x.status)), lac=a.filter(x=>x.status==="Lactating"), calves=a.filter(x=>x.type==="Calf"), male=a.filter(x=>x.gender==="Male"), female=a.filter(x=>x.gender==="Female");
  const milk=list("milkRecords"), milkToday=milk.filter(x=>x.date===today()).reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
  const due=preg.filter(x=>x.expectedCalvingDate&&daysTo(x.expectedCalvingDate)<=30&&daysTo(x.expectedCalvingDate)>=0);
  const overdue=preg.filter(x=>x.expectedCalvingDate&&daysTo(x.expectedCalvingDate)<0);
- return `<div>${pageHeader("Namaste 👋","Aaj ki gaushala ki important information ek jagah.",`<button class="btn btn-primary" onclick="openAnimal()">＋ Add Animal</button>`)}
+ return `<div>${pageHeader("Namaste 👋","Aaj ki gaushala ki important information ek jagah.",isModuleViewOnly("Animals")?"":`<button class="btn btn-primary" onclick="openAnimal()">＋ Add Animal</button>`,"Yahan gaushala ka overall summary dikhta hai — kitne animals hain, aaj kitna doodh nikla, kaunsi cow pregnant ya sick hai. Roz subah sabse pehle yahi dekhein.")}
  <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-5">
  ${stat("Total",a.length,"🐄")}${stat("Female",female.length,"♀")}${stat("Male",male.length,"♂")}${stat("Calves",calves.length,"🐮")}${stat("Pregnant",preg.length,"🤰")}${stat("Lactating",lac.length,"🥛")}${stat("Sick",sick.length,"⚠")}
  </div>
@@ -127,16 +168,25 @@ function dashboard(){
 }
 function animalTable(arr){
  if(!arr.length)return `<div class="py-12 text-center text-slate-400">No animals found.</div>`;
- return `<div class="overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-slate-400 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center">${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-slate-400">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3">${esc(a.gender)}</td><td class="p-3">${esc(a.type)}</td><td class="p-3">${esc(a.breed||"—")}</td><td class="p-3">${badge(a.status)}</td><td class="p-3">${esc(a.shed||"—")}</td><td class="p-3 text-right"><button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button></td></tr>`).join("")}</tbody></table></div>`
+ const viewOnly=isModuleViewOnly("Animals");
+ return `<div class="overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-slate-400 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden">${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-slate-400">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3">${esc(a.gender)}</td><td class="p-3">${esc(a.type)}</td><td class="p-3">${esc(a.breed||"—")}</td><td class="p-3">${badge(a.status)}</td><td class="p-3">${esc(a.shed||"—")}</td><td class="p-3 text-right">${viewOnly?`<span class="text-xs text-slate-400">View only</span>`:`<button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button>`}</td></tr>`).join("")}</tbody></table></div>`
 }
 function animalsPage(){
  let a=animals(); if(state.search){let q=state.search.toLowerCase();a=a.filter(x=>`${x.id} ${x.name} ${x.breed} ${x.status} ${x.shed}`.toLowerCase().includes(q))}
- return pageHeader("Animal Registry","Har animal ka permanent profile, QR, health aur complete history.",`<button class="btn btn-primary" onclick="openAnimal()">＋ Add Animal</button>`)
+ return pageHeader("Animal Registry","Har animal ka permanent profile, QR, health aur complete history.",isModuleViewOnly("Animals")?"":`<button class="btn btn-primary" onclick="openAnimal()">＋ Add Animal</button>`,"Har cow/bull/calf ka permanent record yahan banta hai — naam, breed, status, shed. Naya animal aane par yahin add karein, kisi bhi animal ka poora profile dekhne ke liye 'Open' dabayein.")
  +`<div class="card p-5">${animalTable(a)}</div>`
 }
 function openAnimal(animalId=""){
+ if(isModuleViewOnly("Animals")){toast(`${state.role} role sirf Animals dekh sakta hai, edit nahi`,false);return}
  const a=findAnimal(animalId)||{id:"",name:"",gender:"Female",type:"Cow",breed:"",dob:"",shed:"",status:"Healthy",earTag:"",joinedDate:today(),notes:""};
- let upload=`<button type="button" class="btn btn-soft" onclick="cloudinaryUpload()">📷 Upload Photo</button><span id="photoStatus" class="text-xs text-slate-400 ml-2">${a.photo?"Photo uploaded":"Optional"}</span>`;
+ window.currentPhoto=a.photo||"";
+ let upload=`<input type="file" id="photoInput" accept="image/*" class="hidden" onchange="handlePhotoSelected(event)">
+  <div class="flex flex-wrap gap-2">
+   <button type="button" class="btn btn-soft" onclick="triggerPhotoInput('camera')">📷 Take Photo</button>
+   <button type="button" class="btn btn-soft" onclick="triggerPhotoInput('gallery')">🖼️ Choose Photo</button>
+  </div>
+  <span id="photoStatus" class="text-xs text-slate-400 block mt-2">${a.photo?"Photo already saved. Uploading a new one will replace it.":"Photos are auto-compressed before upload to save storage."}</span>
+  <div id="photoPreviewWrap">${a.photo?`<img id="photoPreview" src="${esc(a.photo)}" class="mt-2 w-20 h-20 object-cover rounded-lg border">`:""}</div>`;
  modal(animalId?"Edit Animal":"Add Animal",formGrid(
   field("Animal ID","id",a.id,"text",animalId?"readonly":"")+
   field("Name / Nickname","name",a.name)+
@@ -149,20 +199,21 @@ function openAnimal(animalId=""){
   `<label class="md:col-span-2">Photo<div class="mt-1">${upload}</div></label>`+
   `<label class="md:col-span-2">Notes<textarea class="input mt-1" name="notes" rows="3">${esc(a.notes)}</textarea></label>`
  ),`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitAnimal('${animalId}')">Save Animal</button>`);
- window.currentPhoto=a.photo||"";
 }
 async function submitAnimal(existing){
- const f=document.querySelector("#modalRoot form"); 
  const root=document.getElementById("modalRoot"); const inputs=root.querySelectorAll("[name]");let d={};inputs.forEach(x=>d[x.name]=x.value);
+ if(!d.id){toast("Animal ID is required",false);return}
+ if(!existing && findAnimal(d.id)){toast("This Animal ID already exists",false);return}
  d.photo=window.currentPhoto||""; if(!d.id)d.id=id("COW");
  try{await save("animals",d.id,d);toast("Animal saved");closeModal()}catch(e){toast(e.message,false)}
 }
 function pregnancyPage(){
  let rows=list("pregnancies").sort((a,b)=>(a.expectedCalvingDate||"").localeCompare(b.expectedCalvingDate||""));
- return pageHeader("Pregnancy & Calving","Breeding date + 283 days se expected calving automatically calculate hota hai.",`<button class="btn btn-primary" onclick="openPregnancy()">＋ Record Pregnancy</button>`)
+ return pageHeader("Pregnancy & Calving","Breeding date + 283 days se expected calving automatically calculate hota hai.",`<button class="btn btn-primary" onclick="openPregnancy()">＋ Record Pregnancy</button>`,"Jab cow ko AI ya natural mating karayi jaaye, uski breeding date yahan daalein — app khud expected calving date nikaal degi (283 din baad) aur cow ka status 'Pregnant' ho jayega.")
  +`<div class="grid md:grid-cols-3 gap-3 mb-5">${stat("Pregnant records",rows.length,"🤰")}${stat("Due ≤30 days",rows.filter(x=>daysTo(x.expectedCalvingDate)>=0&&daysTo(x.expectedCalvingDate)<=30).length,"📅")}${stat("Overdue",rows.filter(x=>daysTo(x.expectedCalvingDate)<0).length,"⏰")}</div><div class="card p-5 overflow-auto">${rows.length?`<table class="w-full text-sm"><thead><tr class="border-b text-xs text-slate-400 uppercase"><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Breeding</th><th class="p-3 text-left">Expected</th><th class="p-3 text-left">Days</th><th class="p-3 text-left">Status</th></tr></thead><tbody>${rows.map(x=>{let d=daysTo(x.expectedCalvingDate);return `<tr class="border-b"><td class="p-3"><b>${esc(x.animalId)}</b><span class="block text-xs text-slate-400">${esc(findAnimal(x.animalId)?.name||"")}</span></td><td class="p-3">${fmt(x.breedingDate)}</td><td class="p-3 font-semibold">${fmt(x.expectedCalvingDate)}</td><td class="p-3">${d<0?`${Math.abs(d)} days overdue`:d===0?"Today":`${d} days`}</td><td class="p-3">${badge(d<0?"Overdue":d<=30?"Pregnant":"Tracked")}</td></tr>`}).join("")}</tbody></table>`:"<div class='py-12 text-center text-slate-400'>No pregnancy records yet.</div>"}</div>`
 }
 function openPregnancy(){
+ if(isModuleHidden("Pregnancy")){toast(`${state.role} role ke paas Pregnancy ka access nahi hai`,false);return}
  const opts=animals().filter(a=>a.gender==="Female"&&a.type!=="Calf").map(a=>`<option value="${a.id}">${a.id} · ${a.name||"Unnamed"}</option>`).join("");
  modal("Record Pregnancy",formGrid(
   `<label class="block text-sm font-semibold text-slate-600">Cow<select class="input mt-1" name="animalId"><option value="">Select cow</option>${opts}</select></label>`+
@@ -176,94 +227,199 @@ async function submitPregnancy(){
  const r=document.getElementById("modalRoot");const animalId=r.querySelector('[name=animalId]').value, breedingDate=r.querySelector('[name=breedingDate]').value;
  if(!animalId||!breedingDate)return toast("Cow and breeding date required",false);
  const d={animalId,breedingDate,method:r.querySelector('[name=method]').value,expectedCalvingDate:addDays(breedingDate,283),confirmed:true};
- await save("pregnancies",id("PREG"),d); await db.ref("animals/"+animalId).update({pregnant:true,status:"Pregnant",expectedCalvingDate:d.expectedCalvingDate});
- toast("Pregnancy saved");closeModal();
+ try{
+  await save("pregnancies",id("PREG"),d); await db.ref("animals/"+animalId).update({pregnant:true,status:"Pregnant",expectedCalvingDate:d.expectedCalvingDate});
+  toast("Pregnancy saved");closeModal();
+ }catch(e){toast(e.message,false)}
 }
 function simplePage(type){
  const configs={
-  Calves:["Calf Management","Birth, mother linkage, weight, growth and preventive care.","births","＋ Add Birth"],
-  Health:["Health & Health Checks","Daily observation, sick alerts, treatment and follow-up.","healthChecks","＋ Health Check"],
-  Medicines:["Medicines & Treatment","Medicine inventory, treatment history and expiry tracking.","medicines","＋ Medicine"],
-  Vaccination:["Vaccination","Individual/group vaccination and next due dates.","vaccinations","＋ Vaccination"],
-  Deworming:["Deworming","Configurable schedule; current 5-month interval can be used but remains editable.","deworming","＋ Deworming"],
-  "Tick Control":["Tick / Chichdi Control","Spray records; current 4-month plan remains configurable.","tickControl","＋ Record Spray"],
-  Feed:["Feed Management","Stock, daily usage, finish date and configurable feeding plans.","feedInventory","＋ Feed Item"],
-  Sheds:["Sheds & Locations","Capacity, current animals, quarantine and movement history.","sheds","＋ Shed"],
-  Workers:["Workers","Roles, assigned shed and access management.","workers","＋ Worker"],
-  Tasks:["Daily Tasks","Assign feeding, cleaning, health and operational tasks.","tasks","＋ Task"],
-  Expenses:["Expenses & Income","Feed, medicines, labour, utilities, donations and other finance.","expenses","＋ Expense"],
+  Calves:["Calf Management","Birth, mother linkage, weight, growth and preventive care.","births","＋ Add Birth","Naye baby calf ka birth record yahan banayein — kis cow ne janm diya, kab, gender aur weight kitna tha."],
+  Health:["Health & Health Checks","Daily observation, sick alerts, treatment and follow-up.","healthChecks","＋ Health Check","Kisi bhi animal ko halki si bhi problem lage toh yahan health check record karein — 'Sick' ya 'Emergency' mark karne par uska status automatically update ho jayega."],
+  Medicines:["Medicines & Treatment","Medicine inventory, treatment history and expiry tracking.","medicines","＋ Medicine","Gaushala mein rakhi saari dawaiyon ka stock aur unki expiry date yahan track karein, taaki koi dawa expire hone se pehle pata chal jaaye."],
+  Vaccination:["Vaccination","Individual/group vaccination and next due dates.","vaccinations","＋ Vaccination","Kaunsi vaccine kab lagi aur agli baar kab lagni hai — yahan record rakhein taaki koi vaccine miss na ho."],
+  Deworming:["Deworming","Configurable schedule; current 5-month interval can be used but remains editable.","deworming","＋ Deworming","Pet ke keede nikalne ki dawa (deworming) kab di gayi aur agli baar kab deni hai — yahan track karein."],
+  "Tick Control":["Tick / Chichdi Control","Spray records; current 4-month plan remains configurable.","tickControl","＋ Record Spray","Chichdi/tick control spray kab kiya gaya aur agli baar kab karna hai — yahan record karein."],
+  Feed:["Feed Management","Stock, daily usage, finish date and configurable feeding plans.","feedInventory","＋ Feed Item","Chara/khaana ka stock, roz ka usage aur kab khatam hoga — yahan manage karein taaki achanak stock khatam na ho jaaye."],
+  Sheds:["Sheds & Locations","Capacity, current animals, quarantine and movement history.","sheds","＋ Shed","Har shed/jagah ki capacity aur kaun kaun se animals wahan hain — yeh yahan manage karein."],
+  Workers:["Workers","Roles, assigned shed and access management.","workers","＋ Worker","Gaushala mein kaam karne wale sab workers ki list, unka role aur contact number yahan rakhein."],
+  Tasks:["Daily Tasks","Assign feeding, cleaning, health and operational tasks.","tasks","＋ Task","Roz ke kaam — safai, khilana, dawai dena — kisi worker ko assign karein aur uska status track karein."],
+  Expenses:["Expenses & Income","Feed, medicines, labour, utilities, donations and other finance.","expenses","＋ Expense","Chara, dawai, labour, bijli-paani jaisa har kharcha yahan darj karein taaki gaushala ka pura hisaab-kitab mile."],
  };
  const c=configs[type];let rows=list(c[2]);if(state.search){let q=state.search.toLowerCase();rows=rows.filter(x=>JSON.stringify(x).toLowerCase().includes(q))}
- return pageHeader(c[0],c[1],`<button class="btn btn-primary" onclick="openRecord('${type}')">${c[3]}</button>`)
- +`<div class="card p-5"><div class="flex items-center justify-between mb-4"><span class="text-sm text-slate-500">${rows.length} records</span><input class="input !w-64" placeholder="Filter records" oninput="state.search=this.value;renderPage()"></div>${genericTable(type,rows)}</div>`
+ return pageHeader(c[0],c[1],isModuleViewOnly(type)?"":`<button class="btn btn-primary" onclick="openRecord('${type}')">${c[3]}</button>`,c[4])
+ +`<div class="card p-5"><div class="flex items-center justify-between mb-4"><span class="text-sm text-slate-500">${rows.length} records</span><input class="input !w-64" placeholder="Filter records" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div>${genericTable(type,rows)}</div>`
 }
 function genericTable(type,rows){
  if(!rows.length)return `<div class="py-14 text-center text-slate-400">No records yet. Add the first record.</div>`;
- let keys=Object.keys(rows[0]).filter(k=>!["id","updatedAt"].includes(k)).slice(0,6);
- return `<div class="overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-slate-400">${keys.map(k=>`<th class="p-3 text-left">${esc(k.replace(/([A-Z])/g," $1"))}</th>`).join("")}<th></th></tr></thead><tbody>${rows.slice(0,100).map(x=>`<tr class="border-b">${keys.map(k=>`<td class="p-3">${k.toLowerCase().includes("date")?fmt(x[k]):k==="status"?badge(x[k]):esc(x[k])}</td>`).join("")}<td class="p-3 text-right"><button class="btn btn-danger !p-2" onclick="deleteRecord('${type}','${x.id}')">Delete</button></td></tr>`).join("")}</tbody></table></div>`
+ const viewOnly=isModuleViewOnly(type);
+ let keys=Object.keys(rows[0]).filter(k=>!["id","updatedAt","createdAt"].includes(k)).slice(0,6);
+ return `<div class="overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-slate-400">${keys.map(k=>`<th class="p-3 text-left">${esc(k.replace(/([A-Z])/g," $1"))}</th>`).join("")}<th></th></tr></thead><tbody>${rows.slice(0,100).map(x=>`<tr class="border-b">${keys.map(k=>`<td class="p-3">${k.toLowerCase().includes("date")?fmt(x[k]):k==="status"?badge(x[k]):esc(x[k])}</td>`).join("")}<td class="p-3 text-right">${viewOnly?`<span class="text-xs text-slate-400">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('${type}','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('${type}','${x.id}')">Delete</button></div>`}</td></tr>`).join("")}</tbody></table></div>`
 }
+const recordPaths={Calves:"births",Health:"healthChecks",Medicines:"medicines",Vaccination:"vaccinations",Deworming:"deworming","Tick Control":"tickControl",Feed:"feedInventory",Sheds:"sheds",Workers:"workers",Tasks:"tasks",Expenses:"expenses",Milk:"milkRecords"};
 const recordFields={
- Calves:[["animalId","Mother ID","text"],["birthDate","Birth Date","date"],["gender","Gender","select:Male|Female"],["birthWeight","Birth Weight (kg)","number"],["notes","Notes","text"]],
- Health:[["animalId","Animal ID","text"],["date","Date","date"],["status","Status","select:Normal|Watch|Sick|Emergency"],["temperature","Temperature","number"],["remarks","Remarks","text"]],
+ Calves:[["animalId","Mother ID","text",true],["birthDate","Birth Date","date"],["gender","Gender","select:Male|Female"],["birthWeight","Birth Weight (kg)","number"],["notes","Notes","text"]],
+ Health:[["animalId","Animal ID","text",true],["date","Date","date"],["status","Status","select:Normal|Watch|Sick|Emergency"],["temperature","Temperature","number"],["remarks","Remarks","text"]],
  Medicines:[["name","Medicine Name","text"],["batch","Batch Number","text"],["quantity","Quantity","number"],["unit","Unit","text"],["expiryDate","Expiry Date","date"],["minimumStock","Minimum Stock","number"]],
- Vaccination:[["animalId","Animal / Group","text"],["vaccine","Vaccine Name","text"],["date","Date","date"],["nextDueDate","Next Due Date","date"],["batch","Batch Number","text"],["remarks","Remarks","text"]],
- Deworming:[["animalId","Animal / Group","text"],["date","Date","date"],["medicine","Medicine","text"],["nextDueDate","Next Due Date","date"],["dose","Dose","text"],["remarks","Remarks","text"]],
- "Tick Control":[["animalId","Animal / Group","text"],["date","Date","date"],["product","Product","text"],["nextDueDate","Next Due Date","date"],["dose","Dose / Concentration","text"],["remarks","Remarks","text"]],
+ Vaccination:[["animalId","Animal / Group","text",true],["vaccine","Vaccine Name","text"],["date","Date","date"],["nextDueDate","Next Due Date","date"],["batch","Batch Number","text"],["remarks","Remarks","text"]],
+ Deworming:[["animalId","Animal / Group","text",true],["date","Date","date"],["medicine","Medicine","text"],["nextDueDate","Next Due Date","date"],["dose","Dose","text"],["remarks","Remarks","text"]],
+ "Tick Control":[["animalId","Animal / Group","text",true],["date","Date","date"],["product","Product","text"],["nextDueDate","Next Due Date","date"],["dose","Dose / Concentration","text"],["remarks","Remarks","text"]],
  Feed:[["name","Feed Item","text"],["unit","Unit","text"],["openingStock","Opening Stock","number"],["purchase","Purchase","number"],["dailyUsage","Daily Usage","number"],["minimumStock","Minimum Stock","number"],["cost","Cost","number"]],
  Sheds:[["name","Shed Name","text"],["capacity","Capacity","number"],["responsibleWorker","Responsible Worker","text"],["notes","Notes","text"]],
  Workers:[["name","Name","text"],["phone","Phone","text"],["role","Role","select:Worker|Manager|Veterinarian"],["shed","Assigned Shed","text"],["joiningDate","Joining Date","date"]],
  Tasks:[["title","Task","text"],["assignedTo","Assigned Worker","text"],["date","Date","date"],["priority","Priority","select:Low|Normal|High|Urgent"],["status","Status","select:Pending|In Progress|Completed|Skipped"],["notes","Notes","text"]],
- Expenses:[["date","Date","date"],["category","Category","select:Green fodder|Dry fodder|Concentrate|Medicine|Veterinary|Labour|Electricity|Water|Repair|Transport|Equipment|Other"],["amount","Amount","number"],["vendor","Vendor","text"],["paymentMethod","Payment Method","select:Cash|UPI|Bank|Other"],["notes","Notes","text"]]
+ Expenses:[["date","Date","date"],["category","Category","select:Green fodder|Dry fodder|Concentrate|Medicine|Veterinary|Labour|Electricity|Water|Repair|Transport|Equipment|Other"],["amount","Amount","number"],["vendor","Vendor","text"],["paymentMethod","Payment Method","select:Cash|UPI|Bank|Other"],["notes","Notes","text"]],
+ Milk:[["animalId","Cow","text",true],["date","Date","date"],["morning","Morning (L)","number"],["evening","Evening (L)","number"],["notes","Notes","text"]]
 };
-function openRecord(type){
- const fields=recordFields[type];let html=formGrid(fields.map(([n,l,t])=>t.startsWith("select:")?select(l,n,t.slice(7).split("|")):field(l,n,n.toLowerCase().includes("date")?today():"",t)).join(""));
- modal(`Add ${type} Record`,html,`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitRecord('${type}')">Save Record</button>`);
+function openRecord(type,key){
+ const fields=recordFields[type];
+ if(!fields){toast(`Unknown record type: ${type}`,false);return}
+ if(isModuleHidden(type)||isModuleViewOnly(type)){toast(`${state.role} role ke paas is action ki permission nahi hai`,false);return}
+ const existing=key?list(recordPaths[type]).find(r=>r.id===key):null;
+ let html=formGrid(fields.map(([n,l,t,isAnimal])=>{
+   if(t.startsWith("select:"))return select(l,n,t.slice(7).split("|"),existing?existing[n]:"");
+   const val=existing?existing[n]:(n.toLowerCase().includes("date")?today():"");
+   const extra=isAnimal?'list="animalIds" placeholder="Animal ID or group name"':"";
+   return field(l,n,val,t,extra);
+ }).join(""));
+ if(fields.some(f=>f[3]))html+=animalDatalist();
+ modal(`${key?"Edit":"Add"} ${type} Record`,html,`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitRecord('${type}','${key||""}')">Save Record</button>`);
 }
-async function submitRecord(type){
- const map={Calves:"births",Health:"healthChecks",Medicines:"medicines",Vaccination:"vaccinations",Deworming:"deworming","Tick Control":"tickControl",Feed:"feedInventory",Sheds:"sheds",Workers:"workers",Tasks:"tasks",Expenses:"expenses"};
- let d={};document.querySelectorAll("#modalRoot [name]").forEach(x=>d[x.name]=x.value);d.createdAt=new Date().toISOString();
- if(type==="Health" && ["Sick","Emergency"].includes(d.status)){let a=findAnimal(d.animalId);if(a)await db.ref("animals/"+a.id).update({status:d.status})}
- await save(map[type],id(type.toUpperCase().replace(/ /g,"")),d);toast(`${type} record saved`);closeModal();
+async function submitRecord(type,key){
+ const fields=recordFields[type];
+ const path=recordPaths[type];
+ if(!fields||!path){toast(`Unknown record type: ${type}`,false);return}
+ let d={};document.querySelectorAll("#modalRoot [name]").forEach(x=>d[x.name]=x.value);
+ const [requiredName,requiredLabel]=fields[0];
+ if(!d[requiredName]){toast(`${requiredLabel} is required`,false);return}
+ if(!key)d.createdAt=new Date().toISOString();
+ try{
+  if(type==="Health"&&["Sick","Emergency"].includes(d.status)){let a=findAnimal(d.animalId);if(a)await db.ref("animals/"+a.id).update({status:d.status})}
+  await save(path,key||id(type.toUpperCase().replace(/ /g,"")),d);
+  toast(`${type} record saved`);closeModal();
+ }catch(e){toast(e.message,false)}
 }
 async function deleteRecord(type,key){
+ if(isModuleHidden(type)||isModuleViewOnly(type)){toast(`${state.role} role ke paas is action ki permission nahi hai`,false);return}
  if(!confirm("Delete this record?"))return;
- const map={Calves:"births",Health:"healthChecks",Medicines:"medicines",Vaccination:"vaccinations",Deworming:"deworming","Tick Control":"tickControl",Feed:"feedInventory",Sheds:"sheds",Workers:"workers",Tasks:"tasks",Expenses:"expenses"};
- await remove(map[type],key);toast("Deleted");
+ const path=recordPaths[type];
+ try{await remove(path,key);toast("Deleted")}catch(e){toast(e.message,false)}
 }
 function milkPage(){
  const rows=list("milkRecords").sort((a,b)=>(b.date||"").localeCompare(a.date||""));
- return pageHeader("Milk Production","Morning + evening milk records, daily totals and cow-wise history.",`<button class="btn btn-primary" onclick="openRecord('Milk')">＋ Record Milk</button>`)
+ return pageHeader("Milk Production","Morning + evening milk records, daily totals and cow-wise history.",isModuleViewOnly("Milk")?"":`<button class="btn btn-primary" onclick="openRecord('Milk')">＋ Record Milk</button>`,"Har cow ka roz ka subah-shaam doodh yahan record karein — total production track karne ke liye.")
  +`<div class="grid md:grid-cols-3 gap-3 mb-5">${stat("Today's milk",rows.filter(x=>x.date===today()).reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0).toFixed(1)+" L","🥛")}${stat("Milk records",rows.length,"📝")}${stat("Lactating",animals().filter(x=>x.status==="Lactating").length,"🐄")}</div><div class="card p-5">${genericTable("Milk",rows)}</div>`
 }
 function reportsPage(){
  const a=animals(), exp=list("expenses").reduce((s,x)=>s+Number(x.amount||0),0), milk=list("milkRecords").reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
- return pageHeader("Reports","Quick operational summary. Export-ready data remains in Firebase.",`<button class="btn btn-soft" onclick="exportAnimals()">↓ Export Animals CSV</button>`)
+ return pageHeader("Reports","Quick operational summary. Export-ready data remains in Firebase.",`<button class="btn btn-soft" onclick="exportAnimals()">↓ Export Animals PDF</button>`,"Yahan se animal, milk, expenses jaisi saari reports dekh sakte hain aur Animal Registry ko PDF me download kar sakte hain.")
  +`<div class="grid md:grid-cols-3 gap-4 mb-5">${stat("Animals",a.length,"🐄")}${stat("Total milk records",milk.toFixed(1)+" L","🥛")}${stat("Expenses recorded","₹"+exp.toLocaleString("en-IN"),"₹")}</div>
  <div class="card p-5"><h3 class="font-bold">Monthly / operational reports</h3><div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">${["Animal Master","Pregnancy & Calving","Milk Production","Feed Consumption","Medical Treatment","Vaccination","Deworming","Tick Control","Sick Animals","Mortality","Worker Tasks","Expenses"].map(x=>`<button class="btn btn-soft justify-start" onclick="toast('Use Firebase data + Export for ${x}')">📄 ${x}</button>`).join("")}</div></div>`
 }
+function storageStats(){
+ const fbBytes=new Blob([JSON.stringify(state.data||{})]).size;
+ const media=list("mediaLog");
+ const cloudBytes=media.reduce((s,x)=>s+Number(x.bytes||0),0);
+ return {fbBytes,cloudBytes,cloudCount:media.length};
+}
 function settingsPage(){
- return pageHeader("Settings","Configure Cloudinary photo uploads and operational preferences.")
- +`<div class="grid lg:grid-cols-2 gap-5"><div class="card p-5"><h3 class="font-bold mb-4">Cloudinary</h3>${field("Cloud Name","cloudName",state.cloud.name)}${field("Unsigned Upload Preset","cloudPreset",state.cloud.preset)}<p class="text-xs text-slate-400 mt-3">Never put your Cloudinary API secret in browser code. Use an unsigned upload preset.</p><button class="btn btn-primary mt-4" onclick="saveCloudSettings()">Save Cloudinary Settings</button></div>
- <div class="card p-5"><h3 class="font-bold mb-4">Preventive schedules</h3>${field("Deworming interval (days)","dewormDays",localStorage.dewormDays||"150","number")}${field("Tick control interval (days)","tickDays",localStorage.tickDays||"120","number")}<button class="btn btn-primary mt-4" onclick="localStorage.dewormDays=document.querySelector('[name=dewormDays]').value;localStorage.tickDays=document.querySelector('[name=tickDays]').value;toast('Schedule settings saved')">Save Schedules</button></div></div>`
+ const s=storageStats();
+ return pageHeader("Settings","Configure Cloudinary photo uploads and operational preferences.","","Yahan Cloudinary photo-upload settings aur deworming/tick-control ke schedule interval set karein. Yeh page sirf Owner/Admin aur Manager ko dikhta hai.")
+ +`<div class="grid lg:grid-cols-2 gap-5">
+   <div class="card p-5"><h3 class="font-bold mb-4">Cloudinary</h3>${field("Cloud Name","cloudName",state.cloud.name)}${field("Unsigned Upload Preset","cloudPreset",state.cloud.preset)}<p class="text-xs text-slate-400 mt-3">Never put your Cloudinary API secret in browser code. Use an unsigned upload preset only.</p><button class="btn btn-primary mt-4" onclick="saveCloudSettings()">Save Cloudinary Settings</button></div>
+   <div class="card p-5"><h3 class="font-bold mb-4">Preventive schedules</h3>${field("Deworming interval (days)","dewormDays",localStorage.dewormDays||"150","number")}${field("Tick control interval (days)","tickDays",localStorage.tickDays||"120","number")}<button class="btn btn-primary mt-4" onclick="localStorage.dewormDays=document.querySelector('[name=dewormDays]').value;localStorage.tickDays=document.querySelector('[name=tickDays]').value;toast('Schedule settings saved')">Save Schedules</button></div>
+ </div>
+ <div class="card p-5 mt-5">
+  <h3 class="font-bold mb-1">Storage Usage</h3>
+  <p class="text-xs text-slate-500 mb-4">A browser app can't securely pull your exact Firebase or Cloudinary account totals — that needs a private key kept off the browser. The numbers below are estimated from what this app itself has stored, so use them as a guide and check the official dashboards for exact figures.</p>
+  <div class="grid md:grid-cols-2 gap-3">
+   <div class="bg-slate-50 rounded-xl p-4"><span class="text-xs text-slate-500">Firebase data (estimated)</span><b class="block text-2xl mt-1">${fmtBytes(s.fbBytes)}</b><span class="text-xs text-slate-400">Free (Spark) plan storage limit ≈ 1 GB</span></div>
+   <div class="bg-slate-50 rounded-xl p-4"><span class="text-xs text-slate-500">Cloudinary photos (this app)</span><b class="block text-2xl mt-1">${fmtBytes(s.cloudBytes)}</b><span class="text-xs text-slate-400">${s.cloudCount} photo(s) uploaded here · free plan ≈ 25 GB</span></div>
+  </div>
+  <div class="flex flex-wrap gap-2 mt-4">
+   <a class="btn btn-soft" href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/usage" target="_blank" rel="noopener">Open Firebase Console →</a>
+   <a class="btn btn-soft" href="https://cloudinary.com/console/media_library" target="_blank" rel="noopener">Open Cloudinary Console →</a>
+  </div>
+ </div>`
 }
 function renderPage(){
  const c=document.getElementById("content");if(!c)return;
  let html=state.page==="Dashboard"?dashboard():state.page==="Animals"?animalsPage():state.page==="Pregnancy"?pregnancyPage():state.page==="Milk"?milkPage():state.page==="Reports"?reportsPage():state.page==="Settings"?settingsPage():simplePage(state.page);
  c.innerHTML=html;
 }
-function saveCloudSettings(){state.cloud.name=document.querySelector('[name=cloudName]').value;state.cloud.preset=document.querySelector('[name=cloudPreset]').value;localStorage.cloudinaryName=state.cloud.name;localStorage.cloudinaryPreset=state.cloud.preset;toast("Cloudinary settings saved")}
-function cloudinaryUpload(){
- if(!state.cloud.name||!state.cloud.preset){toast("Settings me Cloudinary Cloud Name aur Unsigned Preset add karein",false);return}
- cloudinary.openUploadWidget({cloudName:state.cloud.name,uploadPreset:state.cloud.preset,sources:["local","camera"],multiple:false,folder:"gaushala/animals",clientAllowedFormats:["jpg","jpeg","png","webp"],maxFileSize:5000000},(err,res)=>{
-   if(!err&&res&&res.event==="success"){window.currentPhoto=res.info.secure_url;document.getElementById("photoStatus").textContent="Photo ready ✓";toast("Photo uploaded")}
+function saveCloudSettings(){state.cloud.name=document.querySelector('[name=cloudName]').value.trim();state.cloud.preset=document.querySelector('[name=cloudPreset]').value.trim();localStorage.cloudinaryName=state.cloud.name;localStorage.cloudinaryPreset=state.cloud.preset;toast("Cloudinary settings saved")}
+
+// ---- Photo capture + compression + Cloudinary upload ----
+function compressImage(file,maxDim=1280,quality=0.72){
+ return new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onerror=()=>reject(new Error("Could not read the selected file"));
+  reader.onload=e=>{
+   const img=new Image();
+   img.onerror=()=>reject(new Error("That file doesn't look like a valid image"));
+   img.onload=()=>{
+    let {width,height}=img;
+    if(width>height&&width>maxDim){height=Math.round(height*maxDim/width);width=maxDim}
+    else if(height>=width&&height>maxDim){width=Math.round(width*maxDim/height);height=maxDim}
+    const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,width,height);
+    canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("Image compression failed")),"image/jpeg",quality);
+   };
+   img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
  });
 }
-function exportAnimals(){
- const rows=animals(), keys=["id","name","gender","type","breed","dob","earTag","shed","status","joinedDate"];
- const csv=[keys.join(","),...rows.map(a=>keys.map(k=>`"${String(a[k]??"").replaceAll('"','""')}"`).join(","))].join("\\n");
- const blob=new Blob([csv],{type:"text/csv"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="gaushala-animals.csv";a.click();URL.revokeObjectURL(url);
+function triggerPhotoInput(mode){
+ const inp=document.getElementById("photoInput");
+ if(!inp)return;
+ if(mode==="camera")inp.setAttribute("capture","environment");else inp.removeAttribute("capture");
+ inp.value="";inp.click();
 }
-window.go=go;window.toggleSide=toggleSide;window.openAnimal=openAnimal;window.openPregnancy=openPregnancy;window.closeModal=closeModal;window.submitAnimal=submitAnimal;window.submitPregnancy=submitPregnancy;window.openRecord=openRecord;window.submitRecord=submitRecord;window.deleteRecord=deleteRecord;window.cloudinaryUpload=cloudinaryUpload;window.saveCloudSettings=saveCloudSettings;window.exportAnimals=exportAnimals;window.state=state;window.renderPage=renderPage;
+async function handlePhotoSelected(e){
+ const file=e.target.files&&e.target.files[0];
+ e.target.value="";
+ if(!file)return;
+ if(!state.cloud.name||!state.cloud.preset){toast("Add your Cloudinary Cloud Name and Upload Preset in Settings first",false);return}
+ const statusEl=document.getElementById("photoStatus");
+ try{
+  if(statusEl)statusEl.innerHTML=`<span class="spinner border-slate-400"></span> Compressing image...`;
+  const originalKb=(file.size/1024).toFixed(0);
+  const blob=await compressImage(file);
+  if(statusEl)statusEl.innerHTML=`<span class="spinner border-slate-400"></span> Uploading (${fmtBytes(blob.size)}, was ${originalKb} KB)...`;
+  const fd=new FormData();
+  fd.append("file",blob,"photo.jpg");
+  fd.append("upload_preset",state.cloud.preset);
+  fd.append("folder","gaushala/animals");
+  const res=await fetch(`https://api.cloudinary.com/v1_1/${state.cloud.name}/image/upload`,{method:"POST",body:fd});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data?.error?.message||"Cloudinary upload failed");
+  window.currentPhoto=data.secure_url;
+  if(statusEl)statusEl.textContent=`Uploaded ✓ (${fmtBytes(blob.size)}, compressed from ${originalKb} KB)`;
+  const wrap=document.getElementById("photoPreviewWrap");
+  if(wrap)wrap.innerHTML=`<img id="photoPreview" src="${esc(data.secure_url)}" class="mt-2 w-20 h-20 object-cover rounded-lg border">`;
+  toast("Photo uploaded");
+  await db.ref("mediaLog/"+id("MED")).set({publicId:data.public_id,url:data.secure_url,bytes:blob.size,createdAt:new Date().toISOString()});
+ }catch(err){
+  if(statusEl)statusEl.textContent="Upload failed — try again";
+  toast(err.message,false);
+ }
+}
+
+function exportAnimals(){
+ if(!window.jspdf){toast("PDF library load nahi hui — internet connection check karein",false);return}
+ const {jsPDF}=window.jspdf;
+ const doc=new jsPDF({orientation:"landscape",unit:"pt"});
+ doc.setFontSize(16);doc.setTextColor(20,83,45);doc.text("Gaushala — Animal Registry",40,36);
+ doc.setFontSize(9);doc.setTextColor(100);doc.text(`Generated: ${fmt(today())} · Total animals: ${animals().length}`,40,52);
+ const rows=animals();
+ const head=[["Animal ID","Name","Gender","Type","Breed","DOB","Ear Tag","Shed","Status","Joined"]];
+ const body=rows.map(a=>[a.id||"—",a.name||"—",a.gender||"—",a.type||"—",a.breed||"—",fmt(a.dob),a.earTag||"—",a.shed||"—",a.status||"—",fmt(a.joinedDate)]);
+ doc.autoTable({head,body,startY:66,margin:{left:40,right:40},styles:{fontSize:8,cellPadding:5},headStyles:{fillColor:[22,101,52],textColor:255},alternateRowStyles:{fillColor:[240,253,244]}});
+ doc.save(`gaushala-animals-${today()}.pdf`);
+ toast("PDF download shuru ho gayi");
+}
+window.go=go;window.toggleSide=toggleSide;window.openAnimal=openAnimal;window.openPregnancy=openPregnancy;window.closeModal=closeModal;window.submitAnimal=submitAnimal;window.submitPregnancy=submitPregnancy;window.openRecord=openRecord;window.submitRecord=submitRecord;window.deleteRecord=deleteRecord;window.triggerPhotoInput=triggerPhotoInput;window.handlePhotoSelected=handlePhotoSelected;window.saveCloudSettings=saveCloudSettings;window.exportAnimals=exportAnimals;window.state=state;window.renderPage=renderPage;
 
 auth.signInAnonymously().catch(e=>console.warn("Anonymous Auth is not enabled; configure Firebase Auth or use your own login.",e.message));
 loadAll().catch(e=>{document.getElementById("app").innerHTML=`<div class="p-10 max-w-2xl mx-auto"><div class="card p-6"><h1 class="text-xl font-bold text-red-700">Firebase connection error</h1><p class="mt-2 text-slate-600">${esc(e.message)}</p><p class="mt-3 text-sm text-slate-500">Check Realtime Database rules and enable Anonymous Authentication if using this starter.</p></div></div>`});
