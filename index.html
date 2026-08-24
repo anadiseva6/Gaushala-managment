@@ -24,6 +24,27 @@
     .spinner{width:14px;height:14px;border:2px solid #ffffff55;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}@keyframes spin{to{transform:rotate(360deg)}}
     details.info summary{list-style:none;cursor:pointer}details.info summary::-webkit-details-marker{display:none}details.info summary::marker{content:""}
     details.info[open] summary{background:#cbd5ce}
+    /* ---- Family tree (Blood Line) ---- */
+    .famtree,.famtree ul,.famtree li{margin:0;padding:0;list-style:none}
+    .famtree{text-align:center}
+    .famtree,.famtree ul{display:table;margin:0 auto}
+    .famtree li{display:table-cell;vertical-align:top;text-align:center;padding:28px 10px 0 10px;position:relative}
+    .famtree li::before,.famtree li::after{content:"";position:absolute;top:0;right:50%;border-top:2px solid #bbe3c8;width:50%;height:20px}
+    .famtree li::after{right:auto;left:50%;border-left:2px solid #bbe3c8}
+    .famtree li:only-child::after,.famtree li:only-child::before{display:none}
+    .famtree li:only-child{padding-top:0}
+    .famtree li:first-child::before,.famtree li:last-child::after{border:0 none}
+    .famtree li:last-child::before{border-right:2px solid #bbe3c8;border-radius:0 6px 0 0}
+    .famtree li:first-child::after{border-radius:6px 0 0 0}
+    .famtree ul ul::before{content:"";position:absolute;top:0;left:50%;border-left:2px solid #bbe3c8;width:0;height:20px}
+    .fam-card{display:inline-block;min-width:112px;max-width:132px}
+    .fam-relation{font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;min-height:12px}
+    .fam-avatar{width:60px;height:60px;border-radius:999px;background:#f0fdf4;border:3px solid #dcfce7;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 6px;overflow:hidden}
+    .fam-avatar img{width:100%;height:100%;object-fit:cover}
+    .fam-card.selected .fam-avatar{border-color:#16a34a;box-shadow:0 0 0 4px #dcfce7}
+    .fam-card.missing .fam-avatar{border-style:dashed;background:#f8fafc;opacity:.6}
+    .fam-name{font-weight:700;font-size:12.5px;color:#14532d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:132px;margin:0 auto}
+    .fam-sub{font-size:10.5px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:132px;margin:2px auto 0}
   </style>
 </head>
 <body class="text-slate-800">
@@ -50,18 +71,19 @@ const state={
   cloud:{name:localStorage.cloudinaryName||"lw7coppb",preset:localStorage.cloudinaryPreset||"gaushala_images"}
 };
 const modules={
-  Dashboard:["🏠","Dashboard"], Animals:["🐄","Animals"], Pregnancy:["🤰","Pregnancy"], Calves:["🐮","Calves"],
+  Dashboard:["🏠","Dashboard"], Animals:["🐄","Animals"], Pregnancy:["🤰","Pregnancy"], Calves:["🐮","Calves"], "Blood Line":["🧬","Blood Line"],
   Milk:["🥛","Milk"], Feed:["🌾","Feed"], Health:["❤️","Health"], Medicines:["💊","Medicines"],
-  Vaccination:["💉","Vaccination"], Deworming:["🛡️","Deworming"], "Tick Control":["🪲","Tick Control"],
+  Vaccination:["💉","Vaccination"], Deworming:["🛡️","Deworming"], "Tick Control":["🪲","Tick Control"], "Nail Cutting":["✂️","Nail Cutting"],
   Sheds:["🏠","Sheds"], Workers:["👷","Workers"], Tasks:["☑️","Tasks"], Expenses:["₹","Expenses"], Reports:["📊","Reports"], Settings:["⚙️","Settings"]
 };
+const APP_VERSION="v2.3";
 // Role-based access: null = full access. hiddenModules = module poori tarah nazar nahi aayega.
 // viewOnly = module dikhega par Add/Edit/Delete button hidden rahenge, sirf data dekh sakte hain.
 const ROLE_PERMISSIONS={
  "Owner / Admin":null,
  "Manager":{hiddenModules:["Settings"],viewOnly:[]},
  "Veterinarian":{hiddenModules:["Workers","Expenses","Sheds","Settings"],viewOnly:["Animals"]},
- "Worker":{hiddenModules:["Pregnancy","Medicines","Vaccination","Deworming","Tick Control","Sheds","Workers","Expenses","Reports","Settings"],viewOnly:["Animals"]}
+ "Worker":{hiddenModules:["Pregnancy","Medicines","Vaccination","Deworming","Tick Control","Nail Cutting","Sheds","Workers","Expenses","Reports","Settings","Blood Line"],viewOnly:["Animals"]}
 };
 const ROLE_DESCRIPTIONS={
  "Owner / Admin":"Sab kuch dekh aur badal sakte hain — full access, Settings bhi.",
@@ -78,9 +100,15 @@ function changeRole(r){
  renderShell();
 }
 function infoIcon(text){
- return `<details class="info relative inline-block align-middle ml-2"><summary class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[11px] font-bold grid place-items-center hover:bg-slate-300" title="${esc(text)}">i</summary><div class="absolute z-20 left-0 mt-2 w-72 max-w-[80vw] card p-3 text-xs text-slate-600 shadow-lg font-normal">${esc(text)}</div></details>`
+ return `<details class="info relative inline-block align-middle ml-2"><summary class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[11px] font-bold grid place-items-center hover:bg-slate-300" title="${esc(text)}">i</summary><div class="absolute z-30 top-full mt-2 left-0 w-60 max-w-[78vw] card p-3 text-xs text-slate-600 shadow-lg font-normal leading-relaxed break-words">${esc(text)}</div></details>`
 }
-const paths=["animals","pregnancies","calvings","milkRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","feedInventory","feedRecords","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog"];
+function showRoleInfo(){
+ modal("Role Permissions",`<div class="space-y-3 text-sm">${Object.entries(ROLE_DESCRIPTIONS).map(([r,d])=>`<div class="p-3 rounded-xl bg-slate-50 ${r===state.role?"ring-2 ring-green-600":""}"><b class="block text-green-800">${esc(r)}${r===state.role?` <span class="text-xs font-normal text-green-600">(current)</span>`:""}</b><span class="text-slate-600">${esc(d)}</span></div>`).join("")}</div>`,`<button class="btn btn-soft" onclick="closeModal()">Close</button>`);
+}
+document.addEventListener("click",e=>{
+ document.querySelectorAll("details.info[open]").forEach(d=>{if(!d.contains(e.target))d.removeAttribute("open")});
+});
+const paths=["animals","pregnancies","calvings","milkRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","feedRecords","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog"];
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function id(prefix){return prefix+"-"+Math.random().toString(36).slice(2,7).toUpperCase()}
@@ -92,7 +120,7 @@ function fmtBytes(n){n=Number(n||0);if(n<1024)return n+" B";if(n<1024*1024)retur
 function badge(s){
   let c="bg-slate-100 text-slate-700"; if(["Healthy","Completed","Lactating"].includes(s))c="bg-green-100 text-green-800";
   if(["Pregnant","Under Treatment"].includes(s))c="bg-violet-100 text-violet-800"; if(["Sick","Emergency","Overdue"].includes(s))c="bg-red-100 text-red-800";
-  if(["Pending","Quarantine","Dry"].includes(s))c="bg-amber-100 text-amber-800"; return `<span class="badge ${c}">${esc(s||"—")}</span>`
+  if(["Pending","Quarantine","Dry"].includes(s))c="bg-amber-100 text-amber-800"; if(s==="Deceased")c="bg-slate-800 text-white"; return `<span class="badge ${c}">${esc(s||"—")}</span>`
 }
 function toast(msg,ok=true){document.getElementById("toast").innerHTML=`<div class="toast card px-4 py-3 flex items-center gap-2 ${ok?"text-green-800":"text-red-800"}">${ok?"✓":"⚠"} ${esc(msg)}</div>`;setTimeout(()=>document.getElementById("toast").innerHTML="",3000)}
 async function save(path,key,data){if(!key)key=id(path.slice(0,-1).toUpperCase()||"REC");data.updatedAt=new Date().toISOString();await db.ref(`${path}/${key}`).set({...data,id:key});return key}
@@ -103,22 +131,79 @@ function findAnimal(id){return animals().find(a=>a.id===id)}
 function modal(title,body,actions=""){document.getElementById("modalRoot").innerHTML=`<div class="modal-bg fixed inset-0 z-50 p-4 flex items-center justify-center"><div class="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-auto scrollbar"><div class="p-5 border-b flex justify-between items-center"><h3 class="font-bold text-lg">${title}</h3><button onclick="closeModal()" class="text-2xl text-slate-400">×</button></div><div class="p-5">${body}</div>${actions?`<div class="p-5 border-t flex justify-end gap-2">${actions}</div>`:""}</div></div>`}
 function closeModal(){document.getElementById("modalRoot").innerHTML=""}
 function field(label,name,value="",type="text",extra=""){return `<label class="block text-sm font-semibold text-slate-600">${label}<input ${extra} class="input mt-1" name="${name}" type="${type}" value="${esc(value)}"></label>`}
-function select(label,name,opts,value=""){return `<label class="block text-sm font-semibold text-slate-600">${label}<select class="input mt-1" name="${name}">${opts.map(o=>`<option ${o===value?"selected":""}>${esc(o)}</option>`).join("")}</select></label>`}
+function select(label,name,opts,value="",extra=""){return `<label class="block text-sm font-semibold text-slate-600">${label}<select ${extra} class="input mt-1" name="${name}">${opts.map(o=>`<option ${o===value?"selected":""}>${esc(o)}</option>`).join("")}</select></label>`}
 function formGrid(html){return `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${html}</div>`}
 function animalDatalist(){return `<datalist id="animalIds">${animals().map(a=>`<option value="${esc(a.id)}">${esc(a.name||"")}</option>`).join("")}</datalist>`}
+// Walks up the mother chain starting at startId, looking for targetId. Used to block
+// self-references and circular blood lines (an animal can't be its own ancestor).
+function motherChainIncludes(startId,targetId,guard){
+ guard=guard||0;
+ if(!startId||guard>25)return false;
+ if(startId===targetId)return true;
+ const a=findAnimal(startId);
+ if(!a||!a.motherId)return false;
+ return motherChainIncludes(a.motherId,targetId,guard+1);
+}
+// Number of mother-hops walking up from fromId until targetId is found (0 if same animal),
+// or -1 if targetId isn't in fromId's mother chain. Used to label relations (Mother,
+// Grandmother, Child, Grandchild...) relative to whichever animal is selected.
+function chainDistance(fromId,toId,guard){
+ guard=guard||0;
+ if(!fromId||guard>30)return -1;
+ if(fromId===toId)return 0;
+ const a=findAnimal(fromId);
+ if(!a||!a.motherId)return -1;
+ const d=chainDistance(a.motherId,toId,guard+1);
+ return d===-1?-1:d+1;
+}
+const ANCESTOR_LABELS=["","Mother","Grandmother","Great-grandmother"];
+const DESCENDANT_LABELS=["","Child","Grandchild","Great-grandchild"];
+function relationLabel(nodeId,selectedId){
+ if(nodeId===selectedId)return "";
+ let d=chainDistance(selectedId,nodeId);
+ if(d>0)return ANCESTOR_LABELS[d]||(d+"x Great-grandmother");
+ d=chainDistance(nodeId,selectedId);
+ if(d>0)return DESCENDANT_LABELS[d]||(d+"x Great-grandchild");
+ return "";
+}
+// Builds the full family tree (every mother→child link, branching) starting at animalId.
+function buildFamilyTree(animalId,guard){
+ guard=guard||{n:0};
+ const a=findAnimal(animalId);
+ if(!a||guard.n>400)return null;
+ guard.n++;
+ const kids=animals().filter(x=>x.motherId===animalId).sort((p,q)=>(p.dob||"").localeCompare(q.dob||"")).map(c=>buildFamilyTree(c.id,guard)).filter(Boolean);
+ return {...a,children:kids};
+}
+function famCardHTML(node,selectedId){
+ if(node.missing)return `<div class="fam-card missing"><div class="fam-relation">&nbsp;</div><div class="fam-avatar">🐄</div><div class="fam-name text-slate-400">${esc(node.id)}</div><div class="fam-sub">record nahi mila</div></div>`;
+ const rel=relationLabel(node.id,selectedId);
+ return `<div class="fam-card ${node.id===selectedId?"selected":""}">
+  <div class="fam-relation">${rel?esc(rel):(node.id===selectedId?"Selected":"")}</div>
+  <div class="fam-avatar">${node.photo?`<img src="${esc(node.photo)}">`:"🐄"}</div>
+  <div class="fam-name">${esc(node.name||"Unnamed")}</div>
+  <div class="fam-sub">${esc(node.id)}</div>
+  <div class="mt-1">${badge(node.status)}</div>
+ </div>`;
+}
+function renderFamNode(node,selectedId){
+ if(!node)return"";
+ const kids=node.children&&node.children.length?`<ul>${node.children.map(c=>`<li>${renderFamNode(c,selectedId)}</li>`).join("")}</ul>`:"";
+ return famCardHTML(node,selectedId)+kids;
+}
 function nav(){
   return Object.entries(modules).filter(([k])=>!isModuleHidden(k)).map(([k,[i,l]])=>`<button onclick="go('${k}')" class="w-full text-left px-3 py-2.5 rounded-xl flex gap-3 items-center ${state.page===k?"nav-active":"text-slate-500 hover:bg-slate-100"}">${i}<span>${l}</span></button>`).join("")
 }
 function renderShell(){
  document.getElementById("app").innerHTML=`<div class="min-h-screen flex">
  <aside id="side" class="fixed z-40 inset-y-0 left-0 w-64 bg-white border-r -translate-x-full lg:translate-x-0 transition-transform">
-  <div class="h-20 px-5 flex items-center gap-3 border-b"><div class="w-11 h-11 rounded-xl bg-green-100 grid place-items-center text-2xl">🐄</div><div><b class="block">Gaushala</b><span class="text-xs text-slate-400">Management System</span></div></div>
+  <div class="h-20 px-5 flex items-center gap-3 border-b"><div class="w-11 h-11 rounded-xl bg-green-100 grid place-items-center text-2xl">🐄</div><div><b class="block">Gaushala</b><span class="text-xs text-slate-400">Management System · ${APP_VERSION}</span></div></div>
   <div class="p-3 h-[calc(100vh-80px)] overflow-auto scrollbar space-y-1">${nav()}</div>
  </aside>
  <main class="lg:ml-64 min-h-screen w-full">
   <header class="sticky top-0 z-30 h-20 bg-white/95 backdrop-blur border-b px-4 lg:px-8 flex items-center justify-between">
    <div class="flex items-center gap-3"><button class="lg:hidden text-2xl" onclick="toggleSide()">☰</button><div><div class="text-xs text-slate-400">${new Date().toLocaleDateString("en-IN",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div><h1 class="font-bold text-xl">${esc(state.page)}</h1></div></div>
-   <div class="flex items-center gap-2"><div class="hidden md:flex items-center border rounded-xl px-3 bg-slate-50"><span>⌕</span><input class="bg-transparent outline-none p-2 w-56" placeholder="Search..." value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div><div class="flex items-center">${infoIcon("Role change karne se app ke features us role ke hisaab se badal jaate hain — kuch modules chhup jaate hain ya sirf-dekhne-layak ban jaate hain. Details: "+Object.entries(ROLE_DESCRIPTIONS).map(([r,d])=>r+" — "+d).join("  |  "))}<select class="input !w-auto !py-2 ml-1" onchange="changeRole(this.value)">${["Owner / Admin","Manager","Veterinarian","Worker"].map(r=>`<option ${r===state.role?"selected":""}>${esc(r)}</option>`).join("")}</select></div><div class="w-9 h-9 rounded-full bg-green-800 text-white grid place-items-center font-bold">A</div></div>
+   <div class="flex items-center gap-2"><div class="hidden md:flex items-center border rounded-xl px-3 bg-slate-50"><span>⌕</span><input class="bg-transparent outline-none p-2 w-56" placeholder="Search..." value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div><div class="flex items-center"><button type="button" onclick="showRoleInfo()" class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[11px] font-bold grid place-items-center hover:bg-slate-300" title="Role permissions details">i</button><select class="input !w-auto !py-2 ml-1" onchange="changeRole(this.value)">${["Owner / Admin","Manager","Veterinarian","Worker"].map(r=>`<option ${r===state.role?"selected":""}>${esc(r)}</option>`).join("")}</select></div><div class="w-9 h-9 rounded-full bg-green-800 text-white grid place-items-center font-bold">A</div></div>
   </header>
   <section id="content" class="p-4 lg:p-8 max-w-[1600px] mx-auto"></section>
  </main></div>`;
@@ -142,26 +227,51 @@ async function loadAll(){
 }
 function stat(title,val,icon){return `<div class="card p-4"><div class="flex justify-between text-sm text-slate-500"><span>${title}</span><span class="w-8 h-8 rounded-lg bg-green-50 grid place-items-center">${icon}</span></div><b class="block text-2xl mt-3">${val}</b></div>`}
 function pageHeader(title,desc,button="",help=""){return `<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6"><div><h2 class="text-2xl font-bold flex items-center">${title}${help?infoIcon(help):""}</h2><p class="text-sm text-slate-500 mt-1">${desc}</p></div>${button}</div>`}
+function buildAlerts(){
+ const alerts=[];
+ list("pregnancies").forEach(p=>{
+  if(!p.expectedCalvingDate)return;
+  const d=daysTo(p.expectedCalvingDate);
+  if(d<=30){
+   const an=findAnimal(p.animalId);
+   alerts.push({type:"Pregnancy / Calving",icon:"🤰",animalId:p.animalId,animalName:an?an.name:"",due:p.expectedCalvingDate,days:d,extra:`Breeding: ${fmt(p.breedingDate)}`});
+  }
+ });
+ [["vaccinations","Vaccination","💉"],["deworming","Deworming","🛡️"],["tickControl","Tick Control","🪲"],["nailCutting","Nail Cutting","✂️"]].forEach(([path,label,icon])=>{
+  const latestByAnimal={};
+  list(path).forEach(r=>{const k=r.animalId||"—";if(!latestByAnimal[k]||(r.date||"")>(latestByAnimal[k].date||""))latestByAnimal[k]=r});
+  Object.values(latestByAnimal).forEach(r=>{
+   if(!r.nextDueDate)return;
+   const d=daysTo(r.nextDueDate);
+   if(d<=15){
+    const an=findAnimal(r.animalId);
+    alerts.push({type:label,icon,animalId:r.animalId,animalName:an?an.name:"",due:r.nextDueDate,days:d,extra:""});
+   }
+  });
+ });
+ alerts.sort((x,y)=>x.days-y.days);
+ return alerts;
+}
 function dashboard(){
- const a=animals(), preg=a.filter(x=>x.pregnant||x.status==="Pregnant"), sick=a.filter(x=>["Sick","Emergency","Under Treatment"].includes(x.status)), lac=a.filter(x=>x.status==="Lactating"), calves=a.filter(x=>x.type==="Calf"), male=a.filter(x=>x.gender==="Male"), female=a.filter(x=>x.gender==="Female");
+ const allAnimals=animals(), deceased=allAnimals.filter(x=>x.status==="Deceased"), a=allAnimals.filter(x=>x.status!=="Deceased");
+ const preg=a.filter(x=>x.pregnant||x.status==="Pregnant"), sick=a.filter(x=>["Sick","Emergency","Under Treatment"].includes(x.status)), lac=a.filter(x=>x.status==="Lactating"), calves=a.filter(x=>x.type==="Calf"), male=a.filter(x=>x.gender==="Male"), female=a.filter(x=>x.gender==="Female");
  const milk=list("milkRecords"), milkToday=milk.filter(x=>x.date===today()).reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
- const due=preg.filter(x=>x.expectedCalvingDate&&daysTo(x.expectedCalvingDate)<=30&&daysTo(x.expectedCalvingDate)>=0);
- const overdue=preg.filter(x=>x.expectedCalvingDate&&daysTo(x.expectedCalvingDate)<0);
+ const alerts=buildAlerts();
  return `<div>${pageHeader("Namaste 👋","Aaj ki gaushala ki important information ek jagah.",isModuleViewOnly("Animals")?"":`<button class="btn btn-primary" onclick="openAnimal()">＋ Add Animal</button>`,"Yahan gaushala ka overall summary dikhta hai — kitne animals hain, aaj kitna doodh nikla, kaunsi cow pregnant ya sick hai. Roz subah sabse pehle yahi dekhein.")}
- <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-5">
+ <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-3">
  ${stat("Total",a.length,"🐄")}${stat("Female",female.length,"♀")}${stat("Male",male.length,"♂")}${stat("Calves",calves.length,"🐮")}${stat("Pregnant",preg.length,"🤰")}${stat("Lactating",lac.length,"🥛")}${stat("Sick",sick.length,"⚠")}
  </div>
+ ${deceased.length?`<div class="mb-5 text-xs text-slate-400 flex items-center gap-2">🕊️ ${deceased.length} deceased record(s) archived — totals me count nahi hai. <button class="text-green-700 font-semibold underline" onclick="state.animalFilter='deceased';go('Animals')">Dekhein →</button></div>`:`<div class="mb-5"></div>`}
  <div class="grid lg:grid-cols-3 gap-5 mb-5">
   <div class="card p-5 lg:col-span-2"><h3 class="font-bold">Today's Snapshot</h3><div class="grid md:grid-cols-3 gap-3 mt-4">
    <div class="bg-slate-50 rounded-xl p-4"><span class="text-xs text-slate-500">Milk today</span><b class="block text-2xl mt-1">${milkToday.toFixed(1)} L</b></div>
-   <div class="bg-slate-50 rounded-xl p-4"><span class="text-xs text-slate-500">Calving in 30 days</span><b class="block text-2xl mt-1">${due.length}</b></div>
-   <div class="bg-slate-50 rounded-xl p-4"><span class="text-xs text-slate-500">Overdue calving</span><b class="block text-2xl mt-1 text-red-700">${overdue.length}</b></div>
+   <div class="bg-slate-50 rounded-xl p-4"><span class="text-xs text-slate-500">Calving in 30 days</span><b class="block text-2xl mt-1">${preg.filter(x=>x.expectedCalvingDate&&daysTo(x.expectedCalvingDate)>=0&&daysTo(x.expectedCalvingDate)<=30).length}</b></div>
+   <div class="bg-slate-50 rounded-xl p-4"><span class="text-xs text-slate-500">Overdue calving</span><b class="block text-2xl mt-1 text-red-700">${preg.filter(x=>x.expectedCalvingDate&&daysTo(x.expectedCalvingDate)<0).length}</b></div>
   </div></div>
-  <div class="card p-5"><h3 class="font-bold">Alerts</h3><div class="mt-3 space-y-2 text-sm">
-   ${sick.length?`<div class="p-3 rounded-xl bg-red-50 text-red-800">⚠ ${sick.length} animal(s) need health attention.</div>`:"<div class='p-3 rounded-xl bg-green-50 text-green-800'>✓ No sick animals flagged.</div>"}
-   ${due.length?`<div class="p-3 rounded-xl bg-violet-50 text-violet-800">🤰 ${due.length} pregnancy record(s) due within 30 days.</div>`:""}
-   ${overdue.length?`<div class="p-3 rounded-xl bg-red-50 text-red-800">⏰ ${overdue.length} calving record(s) overdue.</div>`:""}
-  </div></div>
+  <div class="card p-5"><h3 class="font-bold mb-1">Upcoming &amp; Overdue Alerts</h3><p class="text-xs text-slate-400 mb-3">Pregnancy (≤30 din) + Vaccination/Deworming/Tick/Nail Cutting (≤15 din)</p>
+   ${sick.length?`<div class="p-3 rounded-xl bg-red-50 text-red-800 text-sm mb-2">⚠ ${sick.length} animal(s) need health attention.</div>`:""}
+   ${!alerts.length?`<div class="p-3 rounded-xl bg-green-50 text-green-800 text-sm">✓ Abhi koi urgent alert nahi hai.</div>`:`<div class="space-y-2 max-h-72 overflow-auto scrollbar">${alerts.map(al=>`<div class="p-2.5 rounded-xl ${al.days<0?"bg-red-50":"bg-amber-50"} text-xs flex items-start gap-2"><span>${al.icon}</span><div class="flex-1"><b>${esc(al.animalId)}</b>${al.animalName?` <span class="text-slate-500">(${esc(al.animalName)})</span>`:""}<span class="block text-slate-500">${esc(al.type)} · Due ${fmt(al.due)}${al.extra?" · "+esc(al.extra):""}</span></div><span class="badge shrink-0 ${al.days<0?"bg-red-100 text-red-800":"bg-amber-100 text-amber-800"}">${al.days<0?Math.abs(al.days)+" din late":al.days===0?"Aaj":al.days+" din"}</span></div>`).join("")}</div>`}
+  </div>
  </div>
  <div class="card p-5"><div class="flex justify-between items-center mb-3"><div><h3 class="font-bold">Recent Animals</h3><p class="text-xs text-slate-400">Live from Firebase Realtime Database</p></div><button class="btn btn-soft" onclick="go('Animals')">View all →</button></div>${animalTable(a.slice(0,10))}</div>
  </div>`
@@ -169,16 +279,41 @@ function dashboard(){
 function animalTable(arr){
  if(!arr.length)return `<div class="py-12 text-center text-slate-400">No animals found.</div>`;
  const viewOnly=isModuleViewOnly("Animals");
- return `<div class="overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-slate-400 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden">${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-slate-400">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3">${esc(a.gender)}</td><td class="p-3">${esc(a.type)}</td><td class="p-3">${esc(a.breed||"—")}</td><td class="p-3">${badge(a.status)}</td><td class="p-3">${esc(a.shed||"—")}</td><td class="p-3 text-right">${viewOnly?`<span class="text-xs text-slate-400">View only</span>`:`<button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button>`}</td></tr>`).join("")}</tbody></table></div>`
+ return `<div class="overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-slate-400 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden">${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-slate-400">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3">${esc(a.gender)}</td><td class="p-3">${esc(a.type)}</td><td class="p-3">${esc(a.breed||"—")}</td><td class="p-3">${badge(a.status)}</td><td class="p-3">${esc(a.shed||"—")}</td><td class="p-3 text-right">${viewOnly?`<span class="text-xs text-slate-400">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button><button class="btn btn-danger !p-2" onclick="deleteAnimal('${esc(a.id)}')">Delete</button></div>`}</td></tr>`).join("")}</tbody></table></div>`
+}
+// Every path where a record can reference an animal via its "animalId" field.
+// When an animal is deleted, all of its records across these modules are deleted too.
+const ANIMAL_LINKED_PATHS=["pregnancies","healthChecks","vaccinations","deworming","tickControl","nailCutting","milkRecords","births"];
+async function deleteAnimal(animalId){
+ if(isModuleViewOnly("Animals")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
+ const a=findAnimal(animalId);
+ if(!confirm(`${animalId}${a&&a.name?" ("+a.name+")":""} ko delete karein? Iske saath judi pregnancy, milk, health, vaccination, deworming, tick control, nail cutting aur birth records bhi delete ho jayenge — yeh wapas nahi ho sakta.`))return;
+ try{
+  const ops=[remove("animals",animalId)];
+  ANIMAL_LINKED_PATHS.forEach(path=>{
+   list(path).filter(r=>r.animalId===animalId).forEach(r=>ops.push(remove(path,r.id)));
+  });
+  await Promise.all(ops);
+  toast("Animal aur uska poora linked data delete ho gaya");
+ }catch(e){toast(e.message,false)}
 }
 function animalsPage(){
- let a=animals(); if(state.search){let q=state.search.toLowerCase();a=a.filter(x=>`${x.id} ${x.name} ${x.breed} ${x.status} ${x.shed}`.toLowerCase().includes(q))}
- return pageHeader("Animal Registry","Har animal ka permanent profile, QR, health aur complete history.",isModuleViewOnly("Animals")?"":`<button class="btn btn-primary" onclick="openAnimal()">＋ Add Animal</button>`,"Har cow/bull/calf ka permanent record yahan banta hai — naam, breed, status, shed. Naya animal aane par yahin add karein, kisi bhi animal ka poora profile dekhne ke liye 'Open' dabayein.")
- +`<div class="card p-5">${animalTable(a)}</div>`
+ if(!state.animalFilter)state.animalFilter="active";
+ let a=animals();
+ if(state.animalFilter==="active")a=a.filter(x=>x.status!=="Deceased");
+ else if(state.animalFilter==="deceased")a=a.filter(x=>x.status==="Deceased");
+ if(state.search){let q=state.search.toLowerCase();a=a.filter(x=>`${x.id} ${x.name} ${x.breed} ${x.status} ${x.shed}`.toLowerCase().includes(q))}
+ const filterBtns=`<div class="flex gap-2 mb-4">
+  <button class="btn ${state.animalFilter==="active"?"btn-primary":"btn-soft"}" onclick="state.animalFilter='active';renderPage()">Active</button>
+  <button class="btn ${state.animalFilter==="deceased"?"btn-primary":"btn-soft"}" onclick="state.animalFilter='deceased';renderPage()">🕊️ Deceased</button>
+  <button class="btn ${state.animalFilter==="all"?"btn-primary":"btn-soft"}" onclick="state.animalFilter='all';renderPage()">All</button>
+ </div>`;
+ return pageHeader("Animal Registry","Har animal ka permanent profile, QR, health aur complete history.",isModuleViewOnly("Animals")?"":`<button class="btn btn-primary" onclick="openAnimal()">＋ Add Animal</button>`,"Har cow/bull/calf ka permanent record yahan banta hai — naam, breed, status, shed. Naya animal aane par yahin add karein, kisi bhi animal ka poora profile dekhne ke liye 'Open' dabayein. Deceased animals alag filter me dikhte hain, totals me count nahi hote.")
+ +`<div class="card p-5">${filterBtns}${animalTable(a)}</div>`
 }
 function openAnimal(animalId=""){
  if(isModuleViewOnly("Animals")){toast(`${state.role} role sirf Animals dekh sakta hai, edit nahi`,false);return}
- const a=findAnimal(animalId)||{id:"",name:"",gender:"Female",type:"Cow",breed:"",dob:"",shed:"",status:"Healthy",earTag:"",joinedDate:today(),notes:""};
+ const a=findAnimal(animalId)||{id:"",name:"",gender:"Female",type:"Cow",breed:"",dob:"",shed:"",status:"Healthy",earTag:"",joinedDate:today(),notes:"",motherId:"",fatherId:"",deathDate:"",deathReason:""};
  window.currentPhoto=a.photo||"";
  let upload=`<input type="file" id="photoInput" accept="image/*" class="hidden" onchange="handlePhotoSelected(event)">
   <div class="flex flex-wrap gap-2">
@@ -195,15 +330,24 @@ function openAnimal(animalId=""){
   field("Breed","breed",a.breed)+field("Date of Birth","dob",a.dob,"date")+
   field("Ear Tag","earTag",a.earTag)+field("Joined Gaushala","joinedDate",a.joinedDate,"date")+
   field("Shed / Location","shed",a.shed)+
-  select("Status","status",["Healthy","Lactating","Pregnant","Dry","Sick","Under Treatment","Quarantine","Emergency"],a.status)+
+  select("Status","status",["Healthy","Lactating","Pregnant","Dry","Sick","Under Treatment","Quarantine","Emergency","Deceased"],a.status,`onchange="document.getElementById('deathFields').style.display=this.value==='Deceased'?'grid':'none'"`)+
+  field("Mother ID (optional — blood line ke liye)","motherId",a.motherId,"text",'list="animalIds"')+
+  field("Father ID (optional)","fatherId",a.fatherId,"text",'list="animalIds"')+
+  `<div id="deathFields" class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-xl bg-slate-50" style="display:${a.status==="Deceased"?"grid":"none"}">${field("Death Date","deathDate",a.deathDate,"date")}${field("Death Reason","deathReason",a.deathReason)}</div>`+
+  animalDatalist()+
   `<label class="md:col-span-2">Photo<div class="mt-1">${upload}</div></label>`+
   `<label class="md:col-span-2">Notes<textarea class="input mt-1" name="notes" rows="3">${esc(a.notes)}</textarea></label>`
- ),`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitAnimal('${animalId}')">Save Animal</button>`);
+ ),`<button class="btn btn-soft" onclick="closeModal()">Cancel</button>${animalId?`<button class="btn btn-danger" onclick="deleteAnimal('${esc(animalId)}');closeModal()">🗑 Delete</button>`:""}<button class="btn btn-primary" onclick="submitAnimal('${animalId}')">Save Animal</button>`);
 }
 async function submitAnimal(existing){
  const root=document.getElementById("modalRoot"); const inputs=root.querySelectorAll("[name]");let d={};inputs.forEach(x=>d[x.name]=x.value);
  if(!d.id){toast("Animal ID is required",false);return}
  if(!existing && findAnimal(d.id)){toast("This Animal ID already exists",false);return}
+ if(d.motherId){
+  if(d.motherId===d.id){toast("Animal apni khud ki Mother nahi ho sakta",false);return}
+  if(motherChainIncludes(d.motherId,d.id)){toast("Yeh Mother ID circular blood line bana degi (is animal ka hi descendant hai)",false);return}
+ }
+ if(d.fatherId&&d.fatherId===d.id){toast("Animal apna khud ka Father nahi ho sakta",false);return}
  d.photo=window.currentPhoto||""; if(!d.id)d.id=id("COW");
  try{await save("animals",d.id,d);toast("Animal saved");closeModal()}catch(e){toast(e.message,false)}
 }
@@ -240,6 +384,7 @@ function simplePage(type){
   Vaccination:["Vaccination","Individual/group vaccination and next due dates.","vaccinations","＋ Vaccination","Kaunsi vaccine kab lagi aur agli baar kab lagni hai — yahan record rakhein taaki koi vaccine miss na ho."],
   Deworming:["Deworming","Configurable schedule; current 5-month interval can be used but remains editable.","deworming","＋ Deworming","Pet ke keede nikalne ki dawa (deworming) kab di gayi aur agli baar kab deni hai — yahan track karein."],
   "Tick Control":["Tick / Chichdi Control","Spray records; current 4-month plan remains configurable.","tickControl","＋ Record Spray","Chichdi/tick control spray kab kiya gaya aur agli baar kab karna hai — yahan record karein."],
+  "Nail Cutting":["Nail Cutting","Hoof / nail trimming schedule — kaunsi cow ki nail kab kati gayi aur agli baar kab kaatni hai.","nailCutting","＋ Record Nail Cutting","Cow ke khur/nail lambe ho jaane se chalne-uthne me problem hoti hai. Yahan record karein ki kis cow ki nail kab kati gayi — app agli due date bhi track karegi."],
   Feed:["Feed Management","Stock, daily usage, finish date and configurable feeding plans.","feedInventory","＋ Feed Item","Chara/khaana ka stock, roz ka usage aur kab khatam hoga — yahan manage karein taaki achanak stock khatam na ho jaaye."],
   Sheds:["Sheds & Locations","Capacity, current animals, quarantine and movement history.","sheds","＋ Shed","Har shed/jagah ki capacity aur kaun kaun se animals wahan hain — yeh yahan manage karein."],
   Workers:["Workers","Roles, assigned shed and access management.","workers","＋ Worker","Gaushala mein kaam karne wale sab workers ki list, unka role aur contact number yahan rakhein."],
@@ -253,17 +398,24 @@ function simplePage(type){
 function genericTable(type,rows){
  if(!rows.length)return `<div class="py-14 text-center text-slate-400">No records yet. Add the first record.</div>`;
  const viewOnly=isModuleViewOnly(type);
- let keys=Object.keys(rows[0]).filter(k=>!["id","updatedAt","createdAt"].includes(k)).slice(0,6);
- return `<div class="overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-slate-400">${keys.map(k=>`<th class="p-3 text-left">${esc(k.replace(/([A-Z])/g," $1"))}</th>`).join("")}<th></th></tr></thead><tbody>${rows.slice(0,100).map(x=>`<tr class="border-b">${keys.map(k=>`<td class="p-3">${k.toLowerCase().includes("date")?fmt(x[k]):k==="status"?badge(x[k]):esc(x[k])}</td>`).join("")}<td class="p-3 text-right">${viewOnly?`<span class="text-xs text-slate-400">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('${type}','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('${type}','${x.id}')">Delete</button></div>`}</td></tr>`).join("")}</tbody></table></div>`
+ // NOTE: Firebase returns object keys in alphabetical order, not insertion order — so we
+ // must build columns from recordFields (the order YOU defined the form in), not from
+ // Object.keys(rows[0]). This is what was making table columns look scrambled/wrong.
+ const fieldDefs=recordFields[type];
+ const cols=fieldDefs
+   ?fieldDefs.map(f=>({key:f[0],label:f[1]}))
+   :Object.keys(rows[0]).filter(k=>!["id","updatedAt","createdAt"].includes(k)).slice(0,6).map(k=>({key:k,label:k.replace(/([A-Z])/g," $1")}));
+ return `<div class="overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-slate-400">${cols.map(c=>`<th class="p-3 text-left">${esc(c.label)}</th>`).join("")}<th></th></tr></thead><tbody>${rows.slice(0,100).map(x=>`<tr class="border-b">${cols.map(c=>`<td class="p-3">${c.key.toLowerCase().includes("date")?fmt(x[c.key]):c.key==="status"?badge(x[c.key]):esc(x[c.key])}</td>`).join("")}<td class="p-3 text-right">${viewOnly?`<span class="text-xs text-slate-400">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('${type}','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('${type}','${x.id}')">Delete</button></div>`}</td></tr>`).join("")}</tbody></table></div>`
 }
-const recordPaths={Calves:"births",Health:"healthChecks",Medicines:"medicines",Vaccination:"vaccinations",Deworming:"deworming","Tick Control":"tickControl",Feed:"feedInventory",Sheds:"sheds",Workers:"workers",Tasks:"tasks",Expenses:"expenses",Milk:"milkRecords"};
+const recordPaths={Calves:"births",Health:"healthChecks",Medicines:"medicines",Vaccination:"vaccinations",Deworming:"deworming","Tick Control":"tickControl","Nail Cutting":"nailCutting",Feed:"feedInventory",Sheds:"sheds",Workers:"workers",Tasks:"tasks",Expenses:"expenses",Milk:"milkRecords"};
 const recordFields={
- Calves:[["animalId","Mother ID","text",true],["birthDate","Birth Date","date"],["gender","Gender","select:Male|Female"],["birthWeight","Birth Weight (kg)","number"],["notes","Notes","text"]],
+ Calves:[["animalId","Mother ID","text",true],["calfId","Calf ID (optional, auto-generated if blank)","text"],["birthDate","Birth Date","date"],["gender","Gender","select:Male|Female"],["birthWeight","Birth Weight (kg)","number"],["notes","Notes","text"]],
  Health:[["animalId","Animal ID","text",true],["date","Date","date"],["status","Status","select:Normal|Watch|Sick|Emergency"],["temperature","Temperature","number"],["remarks","Remarks","text"]],
  Medicines:[["name","Medicine Name","text"],["batch","Batch Number","text"],["quantity","Quantity","number"],["unit","Unit","text"],["expiryDate","Expiry Date","date"],["minimumStock","Minimum Stock","number"]],
  Vaccination:[["animalId","Animal / Group","text",true],["vaccine","Vaccine Name","text"],["date","Date","date"],["nextDueDate","Next Due Date","date"],["batch","Batch Number","text"],["remarks","Remarks","text"]],
  Deworming:[["animalId","Animal / Group","text",true],["date","Date","date"],["medicine","Medicine","text"],["nextDueDate","Next Due Date","date"],["dose","Dose","text"],["remarks","Remarks","text"]],
  "Tick Control":[["animalId","Animal / Group","text",true],["date","Date","date"],["product","Product","text"],["nextDueDate","Next Due Date","date"],["dose","Dose / Concentration","text"],["remarks","Remarks","text"]],
+ "Nail Cutting":[["animalId","Animal / Group","text",true],["date","Date","date"],["intervalDays","Repeat Every (days)","number"],["nextDueDate","Next Due Date","date"],["doneBy","Done By","text"],["remarks","Remarks","text"]],
  Feed:[["name","Feed Item","text"],["unit","Unit","text"],["openingStock","Opening Stock","number"],["purchase","Purchase","number"],["dailyUsage","Daily Usage","number"],["minimumStock","Minimum Stock","number"],["cost","Cost","number"]],
  Sheds:[["name","Shed Name","text"],["capacity","Capacity","number"],["responsibleWorker","Responsible Worker","text"],["notes","Notes","text"]],
  Workers:[["name","Name","text"],["phone","Phone","text"],["role","Role","select:Worker|Manager|Veterinarian"],["shed","Assigned Shed","text"],["joiningDate","Joining Date","date"]],
@@ -295,6 +447,21 @@ async function submitRecord(type,key){
  if(!key)d.createdAt=new Date().toISOString();
  try{
   if(type==="Health"&&["Sick","Emergency"].includes(d.status)){let a=findAnimal(d.animalId);if(a)await db.ref("animals/"+a.id).update({status:d.status})}
+  if(type==="Calves"&&!key){
+   // Blood Line only works off the Animal "motherId" field, so a birth record on its
+   // own doesn't show up there. Auto-create (or link) the calf as a real Animal here.
+   const mother=findAnimal(d.animalId);
+   let calfId=(d.calfId||"").trim();
+   if(!calfId)calfId=id("CALF");
+   if(calfId===d.animalId){toast("Calf ID Mother ID jaisa nahi ho sakta — apne aap ki mother nahi ban sakti",false);return}
+   if(motherChainIncludes(d.animalId,calfId)){toast("Yeh combination circular blood line banayegi — Calf ID check karein",false);return}
+   if(findAnimal(calfId)){
+    await db.ref("animals/"+calfId).update({motherId:d.animalId});
+   }else{
+    await save("animals",calfId,{id:calfId,name:"",gender:d.gender||"Female",type:"Calf",breed:mother?mother.breed:"",dob:d.birthDate||today(),shed:mother?mother.shed:"",status:"Healthy",earTag:"",joinedDate:today(),notes:d.notes||"",motherId:d.animalId,fatherId:"",deathDate:"",deathReason:""});
+   }
+   d.calfId=calfId;
+  }
   await save(path,key||id(type.toUpperCase().replace(/ /g,"")),d);
   toast(`${type} record saved`);closeModal();
  }catch(e){toast(e.message,false)}
@@ -305,16 +472,90 @@ async function deleteRecord(type,key){
  const path=recordPaths[type];
  try{await remove(path,key);toast("Deleted")}catch(e){toast(e.message,false)}
 }
+function milkRecordId(date,animalId){return `MILK-${date}-${animalId}`.replace(/[^A-Za-z0-9-]/g,"")}
 function milkPage(){
- const rows=list("milkRecords").sort((a,b)=>(b.date||"").localeCompare(a.date||""));
- return pageHeader("Milk Production","Morning + evening milk records, daily totals and cow-wise history.",isModuleViewOnly("Milk")?"":`<button class="btn btn-primary" onclick="openRecord('Milk')">＋ Record Milk</button>`,"Har cow ka roz ka subah-shaam doodh yahan record karein — total production track karne ke liye.")
- +`<div class="grid md:grid-cols-3 gap-3 mb-5">${stat("Today's milk",rows.filter(x=>x.date===today()).reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0).toFixed(1)+" L","🥛")}${stat("Milk records",rows.length,"📝")}${stat("Lactating",animals().filter(x=>x.status==="Lactating").length,"🐄")}</div><div class="card p-5">${genericTable("Milk",rows)}</div>`
+ if(!state.milkTab)state.milkTab="entry";
+ if(!state.milkDate)state.milkDate=today();
+ const rows=list("milkRecords");
+ const todayTotal=rows.filter(x=>x.date===today()).reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
+ const tabs=`<div class="flex gap-2 mb-5">
+   <button onclick="state.milkTab='entry';renderPage()" class="btn ${state.milkTab==='entry'?"btn-primary":"btn-soft"}">📝 Daily Entry</button>
+   <button onclick="state.milkTab='history';renderPage()" class="btn ${state.milkTab==='history'?"btn-primary":"btn-soft"}">📜 History</button>
+ </div>`;
+ return pageHeader("Milk Production","Cow-wise daily doodh entry aur puri history ek jagah.","","Daily Entry tab me kisi bhi date ka morning-evening doodh har cow ke liye ek saath bhar sakte hain. History tab me kisi bhi purani date ka record dekh, edit ya delete kar sakte hain.")
+ +`<div class="grid md:grid-cols-3 gap-3 mb-5">${stat("Today's milk",todayTotal.toFixed(1)+" L","🥛")}${stat("Milk records",rows.length,"📝")}${stat("Lactating",animals().filter(x=>x.status==="Lactating").length,"🐄")}</div>`
+ +tabs
+ +(state.milkTab==="history"?milkHistoryTab():milkEntryTab());
+}
+function milkEntryTab(){
+ const viewOnly=isModuleViewOnly("Milk");
+ const cows=animals().filter(a=>a.gender==="Female"&&a.type!=="Calf").sort((a,b)=>(a.id||"").localeCompare(b.id||""));
+ const dateVal=state.milkDate;
+ const rows=cows.map(a=>({a,rec:list("milkRecords").find(r=>r.animalId===a.id&&r.date===dateVal)}));
+ const totalMorning=rows.reduce((s,r)=>s+Number(r.rec?.morning||0),0), totalEvening=rows.reduce((s,r)=>s+Number(r.rec?.evening||0),0);
+ return `<div class="card p-5">
+  <div class="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+   <label class="text-sm font-semibold text-slate-600">Date<input type="date" class="input mt-1" value="${esc(dateVal)}" onchange="state.milkDate=this.value;renderPage()" max="${today()}"></label>
+   <div class="flex gap-2 md:ml-auto text-sm flex-wrap">
+    <div class="bg-green-50 rounded-lg px-3 py-2"><span class="text-xs text-green-700 block">Morning total</span><b>${totalMorning.toFixed(1)} L</b></div>
+    <div class="bg-amber-50 rounded-lg px-3 py-2"><span class="text-xs text-amber-700 block">Evening total</span><b>${totalEvening.toFixed(1)} L</b></div>
+    <div class="bg-slate-100 rounded-lg px-3 py-2"><span class="text-xs text-slate-500 block">Day total</span><b>${(totalMorning+totalEvening).toFixed(1)} L</b></div>
+   </div>
+  </div>
+  ${!cows.length?`<div class="py-14 text-center text-slate-400">Koi female animal registered nahi hai. Pehle Animals module me cow add karein.</div>`:`
+  <div class="overflow-auto"><table class="w-full text-sm" id="milkEntryTable">
+   <thead><tr class="border-b text-xs uppercase text-slate-400"><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Morning (L)</th><th class="p-3 text-left">Evening (L)</th><th class="p-3 text-left">Total</th></tr></thead>
+   <tbody>${rows.map(({a,rec})=>`<tr class="border-b" data-animal="${esc(a.id)}"><td class="p-3"><b>${esc(a.id)}</b><span class="block text-xs text-slate-400">${esc(a.name||"Unnamed")}${a.status?" · "+esc(a.status):""}</span></td>
+    <td class="p-3"><input ${viewOnly?"disabled":""} type="number" min="0" step="0.1" class="input !py-1.5 milk-morning" value="${rec&&rec.morning?rec.morning:""}" placeholder="0" oninput="updateMilkRowTotal(this)"></td>
+    <td class="p-3"><input ${viewOnly?"disabled":""} type="number" min="0" step="0.1" class="input !py-1.5 milk-evening" value="${rec&&rec.evening?rec.evening:""}" placeholder="0" oninput="updateMilkRowTotal(this)"></td>
+    <td class="p-3 row-total text-slate-500">${rec?((Number(rec.morning||0)+Number(rec.evening||0)).toFixed(1)+" L"):"—"}</td>
+   </tr>`).join("")}</tbody>
+  </table></div>
+  ${viewOnly?"":`<button class="btn btn-primary mt-4" onclick="saveMilkEntries()">💾 Save All Entries</button>`}`}
+ </div>`;
+}
+function updateMilkRowTotal(input){
+ const tr=input.closest("tr");
+ const m=Number(tr.querySelector(".milk-morning").value||0), e=Number(tr.querySelector(".milk-evening").value||0);
+ tr.querySelector(".row-total").textContent=(m+e>0)?(m+e).toFixed(1)+" L":"—";
+}
+async function saveMilkEntries(){
+ if(isModuleViewOnly("Milk")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
+ const table=document.getElementById("milkEntryTable");if(!table)return;
+ const date=state.milkDate;
+ let ops=[];
+ table.querySelectorAll("tbody tr").forEach(tr=>{
+  const animalId=tr.dataset.animal;
+  const morning=tr.querySelector(".milk-morning").value;
+  const evening=tr.querySelector(".milk-evening").value;
+  if(morning!==""||evening!==""){
+   ops.push(save("milkRecords",milkRecordId(date,animalId),{animalId,date,morning:Number(morning||0),evening:Number(evening||0)}));
+  }
+ });
+ if(!ops.length){toast("Koi entry nahi bhari",false);return}
+ try{await Promise.all(ops);toast(`${ops.length} cow(s) ka milk record saved`);renderPage()}catch(e){toast(e.message,false)}
+}
+function milkHistoryTab(){
+ const viewOnly=isModuleViewOnly("Milk");
+ let rows=list("milkRecords").sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(a.animalId||"").localeCompare(b.animalId||""));
+ if(state.search){const q=state.search.toLowerCase();rows=rows.filter(x=>`${x.animalId} ${x.date} ${findAnimal(x.animalId)?.name||""}`.toLowerCase().includes(q))}
+ return `<div class="card p-5">
+  <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+   <span class="text-sm text-slate-500">${rows.length} records</span>
+   <input class="input !w-64" placeholder="Cow ID, naam ya date (YYYY-MM-DD) se search karein" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()">
+  </div>
+  ${!rows.length?`<div class="py-14 text-center text-slate-400">Abhi tak koi milk record nahi hai.</div>`:`
+  <div class="overflow-auto"><table class="w-full text-sm">
+   <thead><tr class="border-b text-xs uppercase text-slate-400"><th class="p-3 text-left">Date</th><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Morning</th><th class="p-3 text-left">Evening</th><th class="p-3 text-left">Total</th><th></th></tr></thead>
+   <tbody>${rows.map(x=>`<tr class="border-b"><td class="p-3">${fmt(x.date)}</td><td class="p-3"><b>${esc(x.animalId)}</b><span class="block text-xs text-slate-400">${esc(findAnimal(x.animalId)?.name||"")}</span></td><td class="p-3">${Number(x.morning||0).toFixed(1)} L</td><td class="p-3">${Number(x.evening||0).toFixed(1)} L</td><td class="p-3 font-semibold">${(Number(x.morning||0)+Number(x.evening||0)).toFixed(1)} L</td><td class="p-3 text-right">${viewOnly?`<span class="text-xs text-slate-400">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('Milk','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Milk','${x.id}')">Delete</button></div>`}</td></tr>`).join("")}</tbody>
+  </table></div>`}
+ </div>`;
 }
 function reportsPage(){
- const a=animals(), exp=list("expenses").reduce((s,x)=>s+Number(x.amount||0),0), milk=list("milkRecords").reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
- return pageHeader("Reports","Quick operational summary. Export-ready data remains in Firebase.",`<button class="btn btn-soft" onclick="exportAnimals()">↓ Export Animals PDF</button>`,"Yahan se animal, milk, expenses jaisi saari reports dekh sakte hain aur Animal Registry ko PDF me download kar sakte hain.")
+ const a=animals().filter(x=>x.status!=="Deceased"), exp=list("expenses").reduce((s,x)=>s+Number(x.amount||0),0), milk=list("milkRecords").reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
+ return pageHeader("Reports","Quick operational summary. Har report ab PDF me download ho sakti hai.",`<button class="btn btn-soft" onclick="exportAnimals()">↓ Export Animals PDF</button>`,"Yahan se animal, milk, expenses jaisi saari reports dekh sakte hain. Har button apni report ka PDF banake download kar dega.")
  +`<div class="grid md:grid-cols-3 gap-4 mb-5">${stat("Animals",a.length,"🐄")}${stat("Total milk records",milk.toFixed(1)+" L","🥛")}${stat("Expenses recorded","₹"+exp.toLocaleString("en-IN"),"₹")}</div>
- <div class="card p-5"><h3 class="font-bold">Monthly / operational reports</h3><div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">${["Animal Master","Pregnancy & Calving","Milk Production","Feed Consumption","Medical Treatment","Vaccination","Deworming","Tick Control","Sick Animals","Mortality","Worker Tasks","Expenses"].map(x=>`<button class="btn btn-soft justify-start" onclick="toast('Use Firebase data + Export for ${x}')">📄 ${x}</button>`).join("")}</div></div>`
+ <div class="card p-5"><h3 class="font-bold">Monthly / operational reports</h3><p class="text-xs text-slate-400 mt-1">Kisi bhi report par tap karke uska PDF turant download kar sakte hain.</p><div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">${Object.keys(REPORT_CONFIGS).map(x=>`<button class="btn btn-soft justify-start" onclick="downloadReportPDF('${x}')">📄 ${x}</button>`).join("")}</div></div>`
 }
 function storageStats(){
  const fbBytes=new Blob([JSON.stringify(state.data||{})]).size;
@@ -327,8 +568,9 @@ function settingsPage(){
  return pageHeader("Settings","Configure Cloudinary photo uploads and operational preferences.","","Yahan Cloudinary photo-upload settings aur deworming/tick-control ke schedule interval set karein. Yeh page sirf Owner/Admin aur Manager ko dikhta hai.")
  +`<div class="grid lg:grid-cols-2 gap-5">
    <div class="card p-5"><h3 class="font-bold mb-4">Cloudinary</h3>${field("Cloud Name","cloudName",state.cloud.name)}${field("Unsigned Upload Preset","cloudPreset",state.cloud.preset)}<p class="text-xs text-slate-400 mt-3">Never put your Cloudinary API secret in browser code. Use an unsigned upload preset only.</p><button class="btn btn-primary mt-4" onclick="saveCloudSettings()">Save Cloudinary Settings</button></div>
-   <div class="card p-5"><h3 class="font-bold mb-4">Preventive schedules</h3>${field("Deworming interval (days)","dewormDays",localStorage.dewormDays||"150","number")}${field("Tick control interval (days)","tickDays",localStorage.tickDays||"120","number")}<button class="btn btn-primary mt-4" onclick="localStorage.dewormDays=document.querySelector('[name=dewormDays]').value;localStorage.tickDays=document.querySelector('[name=tickDays]').value;toast('Schedule settings saved')">Save Schedules</button></div>
+   <div class="card p-5"><h3 class="font-bold mb-4">Preventive schedules</h3>${field("Deworming interval (days)","dewormDays",localStorage.dewormDays||"150","number")}${field("Tick control interval (days)","tickDays",localStorage.tickDays||"120","number")}${field("Nail cutting interval (days)","nailDays",localStorage.nailDays||"90","number")}<button class="btn btn-primary mt-4" onclick="localStorage.dewormDays=document.querySelector('[name=dewormDays]').value;localStorage.tickDays=document.querySelector('[name=tickDays]').value;localStorage.nailDays=document.querySelector('[name=nailDays]').value;toast('Schedule settings saved')">Save Schedules</button></div>
  </div>
+ <div class="text-center text-xs text-slate-300 mt-6">Gaushala Management System · ${APP_VERSION}</div>
  <div class="card p-5 mt-5">
   <h3 class="font-bold mb-1">Storage Usage</h3>
   <p class="text-xs text-slate-500 mb-4">A browser app can't securely pull your exact Firebase or Cloudinary account totals — that needs a private key kept off the browser. The numbers below are estimated from what this app itself has stored, so use them as a guide and check the official dashboards for exact figures.</p>
@@ -342,9 +584,28 @@ function settingsPage(){
   </div>
  </div>`
 }
+function bloodlinePage(){
+ const opts=animals().sort((x,y)=>(x.id||"").localeCompare(y.id||""));
+ if(!state.bloodlineAnimal&&opts.length)state.bloodlineAnimal=opts[0].id;
+ const selected=state.bloodlineAnimal;
+ const header=pageHeader("Blood Line / Pedigree","Poora khandan ek family tree ki tarah — sabse purani ancestor se lekar sab descendants tak, ek hi diagram mein.","","Kisi cow ko select karein — uska poora tree (ancestors, siblings, uncle-aunty-jaise branches, descendants) yahan dikhega. Selected animal green ring se highlight hai. Kaam tabhi karega jab Animal profile me 'Mother ID' bhara ho.");
+ const selector=`<div class="card p-5 mb-5"><label class="block text-sm font-semibold text-slate-600">Select Animal<select class="input mt-1 max-w-sm" onchange="state.bloodlineAnimal=this.value;renderPage()">${opts.map(a=>`<option value="${esc(a.id)}" ${a.id===selected?"selected":""}>${esc(a.id)} · ${esc(a.name||"Unnamed")}</option>`).join("")}</select></label></div>`;
+ if(!opts.length)return header+selector+`<div class="card p-5"><div class="py-12 text-center text-slate-400">Pehle Animals module me cow add karein.</div></div>`;
+ if(!findAnimal(selected))return header+selector+`<div class="card p-5"><div class="py-12 text-center text-slate-400">Animal nahi mila.</div></div>`;
+ // Walk up to the topmost resolvable ancestor — that becomes the root of the tree.
+ let rootId=selected,cur=findAnimal(selected),guard=0,danglingMotherId=null;
+ while(cur&&cur.motherId&&guard<25){
+  const mother=findAnimal(cur.motherId);
+  if(!mother){danglingMotherId=cur.motherId;break}
+  cur=mother;rootId=cur.id;guard++;
+ }
+ let rootNode=buildFamilyTree(rootId);
+ if(danglingMotherId)rootNode={id:danglingMotherId,missing:true,children:[rootNode]};
+ return header+selector+`<div class="card p-5 overflow-auto scrollbar"><div class="famtree"><ul><li>${renderFamNode(rootNode,selected)}</li></ul></div></div>`;
+}
 function renderPage(){
  const c=document.getElementById("content");if(!c)return;
- let html=state.page==="Dashboard"?dashboard():state.page==="Animals"?animalsPage():state.page==="Pregnancy"?pregnancyPage():state.page==="Milk"?milkPage():state.page==="Reports"?reportsPage():state.page==="Settings"?settingsPage():simplePage(state.page);
+ let html=state.page==="Dashboard"?dashboard():state.page==="Animals"?animalsPage():state.page==="Pregnancy"?pregnancyPage():state.page==="Milk"?milkPage():state.page==="Blood Line"?bloodlinePage():state.page==="Reports"?reportsPage():state.page==="Settings"?settingsPage():simplePage(state.page);
  c.innerHTML=html;
 }
 function saveCloudSettings(){state.cloud.name=document.querySelector('[name=cloudName]').value.trim();state.cloud.preset=document.querySelector('[name=cloudPreset]').value.trim();localStorage.cloudinaryName=state.cloud.name;localStorage.cloudinaryPreset=state.cloud.preset;toast("Cloudinary settings saved")}
@@ -406,20 +667,42 @@ async function handlePhotoSelected(e){
  }
 }
 
-function exportAnimals(){
+const REPORT_CONFIGS={
+ "Animal Master":{rows:()=>animals(),columns:[["Animal ID","id"],["Name","name"],["Gender","gender"],["Type","type"],["Breed","breed"],["Status","status"],["Shed","shed"],["DOB","dob"],["Joined","joinedDate"]]},
+ "Pregnancy & Calving":{rows:()=>list("pregnancies"),columns:[["Cow ID","animalId"],["Breeding Date","breedingDate"],["Method","method"],["Expected Calving","expectedCalvingDate"]]},
+ "Milk Production":{rows:()=>list("milkRecords").sort((a,b)=>(b.date||"").localeCompare(a.date||"")),columns:[["Date","date"],["Cow ID","animalId"],["Morning (L)","morning"],["Evening (L)","evening"],["Total (L)",r=>(Number(r.morning||0)+Number(r.evening||0)).toFixed(1)]]},
+ "Feed Consumption":{rows:()=>list("feedInventory"),columns:[["Feed Item","name"],["Unit","unit"],["Opening Stock","openingStock"],["Purchase","purchase"],["Daily Usage","dailyUsage"],["Minimum Stock","minimumStock"],["Cost","cost"]]},
+ "Medical Treatment":{rows:()=>list("healthChecks"),columns:[["Animal ID","animalId"],["Date","date"],["Status","status"],["Temperature","temperature"],["Remarks","remarks"]]},
+ "Vaccination":{rows:()=>list("vaccinations"),columns:[["Animal / Group","animalId"],["Vaccine","vaccine"],["Date","date"],["Next Due","nextDueDate"],["Batch","batch"]]},
+ "Deworming":{rows:()=>list("deworming"),columns:[["Animal / Group","animalId"],["Date","date"],["Medicine","medicine"],["Next Due","nextDueDate"],["Dose","dose"]]},
+ "Tick Control":{rows:()=>list("tickControl"),columns:[["Animal / Group","animalId"],["Date","date"],["Product","product"],["Next Due","nextDueDate"],["Dose","dose"]]},
+ "Nail Cutting":{rows:()=>list("nailCutting"),columns:[["Animal / Group","animalId"],["Date","date"],["Repeat Every (days)","intervalDays"],["Next Due","nextDueDate"],["Done By","doneBy"]]},
+ "Sick Animals":{rows:()=>animals().filter(a=>["Sick","Emergency","Under Treatment"].includes(a.status)),columns:[["Animal ID","id"],["Name","name"],["Status","status"],["Shed","shed"]]},
+ "Mortality":{rows:()=>animals().filter(a=>a.status==="Deceased"),columns:[["Animal ID","id"],["Name","name"],["Gender","gender"],["Breed","breed"],["Death Date","deathDate"],["Reason","deathReason"]]},
+ "Worker Tasks":{rows:()=>list("tasks"),columns:[["Task","title"],["Assigned To","assignedTo"],["Date","date"],["Priority","priority"],["Status","status"]]},
+ "Expenses":{rows:()=>list("expenses"),columns:[["Date","date"],["Category","category"],["Amount","amount"],["Vendor","vendor"],["Payment Method","paymentMethod"]]}
+};
+function downloadReportPDF(key){
  if(!window.jspdf){toast("PDF library load nahi hui — internet connection check karein",false);return}
+ const cfg=REPORT_CONFIGS[key];
+ if(!cfg){toast("Report not available",false);return}
+ const rows=cfg.rows();
+ if(!rows.length){toast("Is report ke liye abhi koi data nahi hai",false);return}
  const {jsPDF}=window.jspdf;
  const doc=new jsPDF({orientation:"landscape",unit:"pt"});
- doc.setFontSize(16);doc.setTextColor(20,83,45);doc.text("Gaushala — Animal Registry",40,36);
- doc.setFontSize(9);doc.setTextColor(100);doc.text(`Generated: ${fmt(today())} · Total animals: ${animals().length}`,40,52);
- const rows=animals();
- const head=[["Animal ID","Name","Gender","Type","Breed","DOB","Ear Tag","Shed","Status","Joined"]];
- const body=rows.map(a=>[a.id||"—",a.name||"—",a.gender||"—",a.type||"—",a.breed||"—",fmt(a.dob),a.earTag||"—",a.shed||"—",a.status||"—",fmt(a.joinedDate)]);
+ doc.setFontSize(16);doc.setTextColor(20,83,45);doc.text(`Gaushala — ${key}`,40,36);
+ doc.setFontSize(9);doc.setTextColor(100);doc.text(`Generated: ${fmt(today())} · Records: ${rows.length}`,40,52);
+ const head=[cfg.columns.map(c=>c[0])];
+ const body=rows.map(r=>cfg.columns.map(c=>{
+  const v=typeof c[1]==="function"?c[1](r):r[c[1]];
+  return (typeof c[1]==="string"&&c[1].toLowerCase().includes("date"))?fmt(v):(v===undefined||v===null||v===""?"—":String(v));
+ }));
  doc.autoTable({head,body,startY:66,margin:{left:40,right:40},styles:{fontSize:8,cellPadding:5},headStyles:{fillColor:[22,101,52],textColor:255},alternateRowStyles:{fillColor:[240,253,244]}});
- doc.save(`gaushala-animals-${today()}.pdf`);
+ doc.save(`gaushala-${key.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${today()}.pdf`);
  toast("PDF download shuru ho gayi");
 }
-window.go=go;window.toggleSide=toggleSide;window.openAnimal=openAnimal;window.openPregnancy=openPregnancy;window.closeModal=closeModal;window.submitAnimal=submitAnimal;window.submitPregnancy=submitPregnancy;window.openRecord=openRecord;window.submitRecord=submitRecord;window.deleteRecord=deleteRecord;window.triggerPhotoInput=triggerPhotoInput;window.handlePhotoSelected=handlePhotoSelected;window.saveCloudSettings=saveCloudSettings;window.exportAnimals=exportAnimals;window.state=state;window.renderPage=renderPage;
+function exportAnimals(){downloadReportPDF("Animal Master")}
+window.go=go;window.toggleSide=toggleSide;window.openAnimal=openAnimal;window.deleteAnimal=deleteAnimal;window.openPregnancy=openPregnancy;window.closeModal=closeModal;window.submitAnimal=submitAnimal;window.submitPregnancy=submitPregnancy;window.openRecord=openRecord;window.submitRecord=submitRecord;window.deleteRecord=deleteRecord;window.triggerPhotoInput=triggerPhotoInput;window.handlePhotoSelected=handlePhotoSelected;window.saveCloudSettings=saveCloudSettings;window.exportAnimals=exportAnimals;window.state=state;window.renderPage=renderPage;window.changeRole=changeRole;window.showRoleInfo=showRoleInfo;window.saveMilkEntries=saveMilkEntries;window.updateMilkRowTotal=updateMilkRowTotal;
 
 auth.signInAnonymously().catch(e=>console.warn("Anonymous Auth is not enabled; configure Firebase Auth or use your own login.",e.message));
 loadAll().catch(e=>{document.getElementById("app").innerHTML=`<div class="p-10 max-w-2xl mx-auto"><div class="card p-6"><h1 class="text-xl font-bold text-red-700">Firebase connection error</h1><p class="mt-2 text-slate-600">${esc(e.message)}</p><p class="mt-3 text-sm text-slate-500">Check Realtime Database rules and enable Anonymous Authentication if using this starter.</p></div></div>`});
