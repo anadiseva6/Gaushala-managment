@@ -47,7 +47,9 @@
     .spinner{width:14px;height:14px;border:2px solid #ffffff55;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}@keyframes spin{to{transform:rotate(360deg)}}
     details.info summary{list-style:none;cursor:pointer}details.info summary::-webkit-details-marker{display:none}details.info summary::marker{content:""}
     details.info[open] summary{background:#d8d4c5}
-    .nav-section-label{font-size:.66rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#9a9680;padding:.9rem .75rem .3rem}
+    .nav-section-label{font-size:.66rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#a9c191;padding:.9rem .75rem .3rem}
+    .nav-item.nav-idle{color:#e4ecd8}
+    .nav-item.nav-idle:hover{background:rgba(255,255,255,.1);color:#fff}
     .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;transition:box-shadow .15s,transform .15s}
     .stat-card:hover{box-shadow:0 4px 14px rgba(38,64,28,.08);transform:translateY(-1px)}
     .hero-panel{background:linear-gradient(135deg,#2e4a1f 0%,#385c23 55%,#47752b 100%);color:#fff}
@@ -314,7 +316,7 @@ function publicProfileHTML(bio){
  return `<div class="min-h-screen" style="background:var(--bg)">
  <div class="bio-hero px-4 py-8 md:py-10">
   <div class="max-w-3xl mx-auto flex items-center gap-5">
-   <div class="bio-avatar">${a.photo?`<img src="${esc(a.photo)}">`:"🐄"}</div>
+   <div class="bio-avatar ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img src="${esc(a.photo)}">`:"🐄"}</div>
    <div class="min-w-0">
     <div class="text-white/60 text-xs font-bold uppercase tracking-wider">Gaushala Bio-Data</div>
     <h1 class="font-display text-2xl md:text-3xl font-semibold truncate">${esc(a.name||"Unnamed")}</h1>
@@ -415,7 +417,7 @@ function famCardHTML(node,selectedId){
  const rel=relationLabel(node.id,selectedId);
  return `<div class="fam-card ${node.id===selectedId?"selected":""}">
   <div class="fam-relation">${rel?esc(rel):(node.id===selectedId?"Selected":"")}</div>
-  <div class="fam-avatar">${node.photo?`<img src="${esc(node.photo)}">`:"🐄"}</div>
+  <div class="fam-avatar ${node.photo?"cursor-pointer":""}" ${node.photo?`onclick="viewPhoto('${esc(node.photo)}','${esc(node.name||node.id)}')"`:""}>${node.photo?`<img src="${esc(node.photo)}">`:"🐄"}</div>
   <div class="fam-name">${esc(node.name||"Unnamed")}</div>
   <div class="fam-sub">${esc(node.id)}</div>
   <div class="mt-1">${badge(node.status)}</div>
@@ -440,7 +442,7 @@ function nav(){
   if(!visible.length)return"";
   return `<div class="nav-section-label">${label}</div>`+visible.map(k=>{
    const [i,l]=modules[k];
-   return `<button onclick="go('${k}')" class="nav-item w-full text-left px-3 py-2.5 rounded-xl flex gap-3 items-center text-[14.5px] ${state.page===k?"nav-active":"text-slate-600 hover:bg-black/5"}" aria-current="${state.page===k?"page":"false"}"><span class="text-base leading-none w-5 text-center">${i}</span><span>${l}</span></button>`;
+   return `<button onclick="go('${k}')" class="nav-item w-full text-left px-3 py-2.5 rounded-xl flex gap-3 items-center text-[14.5px] ${state.page===k?"nav-active":"nav-idle"}" aria-current="${state.page===k?"page":"false"}"><span class="text-base leading-none w-5 text-center">${i}</span><span>${l}</span></button>`;
   }).join("");
  }).join("");
 }
@@ -544,7 +546,7 @@ function dashboard(){
 function animalTable(arr){
  if(!arr.length)return `<div class="py-12 text-center text-stone-500">No animals found.</div>`;
  const viewOnly=isModuleViewOnly("Animals");
- return `<div class="overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-stone-500 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden">${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3">${esc(a.gender)}</td><td class="p-3">${esc(a.type)}</td><td class="p-3">${esc(a.breed||"—")}</td><td class="p-3">${badge(a.status)}</td><td class="p-3">${esc(a.shed||"—")}</td><td class="p-3 text-right"><div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" title="Print QR ear-tag" onclick="printAnimalTag('${esc(a.id)}')">🔖 QR</button>${viewOnly?"":`<button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button><button class="btn btn-danger !p-2" onclick="deleteAnimal('${esc(a.id)}')">Delete</button>`}</div></td></tr>`).join("")}</tbody></table></div>`
+ return `<div class="overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-stone-500 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3">${esc(a.gender)}</td><td class="p-3">${esc(a.type)}</td><td class="p-3">${esc(a.breed||"—")}</td><td class="p-3">${badge(a.status)}</td><td class="p-3">${esc(a.shed||"—")}</td><td class="p-3 text-right"><div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" title="Print QR ear-tag" onclick="printAnimalTag('${esc(a.id)}')">🔖 QR</button>${viewOnly?"":`<button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button><button class="btn btn-danger !p-2" onclick="deleteAnimal('${esc(a.id)}')">Delete</button>`}</div></td></tr>`).join("")}</tbody></table></div>`
 }
 // Every path where a record can reference an animal via its "animalId" field.
 // When an animal is deleted, all of its records across these modules are deleted too.
@@ -585,8 +587,8 @@ function openAnimal(animalId=""){
    <button type="button" class="btn btn-soft" onclick="triggerPhotoInput('camera')">📷 Take Photo</button>
    <button type="button" class="btn btn-soft" onclick="triggerPhotoInput('gallery')">🖼️ Choose Photo</button>
   </div>
-  <span id="photoStatus" class="text-xs text-stone-500 block mt-2">${a.photo?"Photo already saved. Uploading a new one will replace it.":"Photos are auto-compressed before upload to save storage."}</span>
-  <div id="photoPreviewWrap">${a.photo?`<img id="photoPreview" src="${esc(a.photo)}" class="mt-2 w-20 h-20 object-cover rounded-lg border">`:""}</div>`;
+  <span id="photoStatus" class="text-xs text-stone-500 block mt-2">${a.photo?"Photo already saved. Tap it below to view full size. Uploading a new one will replace it.":"Photos are auto-compressed before upload to save storage."}</span>
+  <div id="photoPreviewWrap">${a.photo?`<img id="photoPreview" src="${esc(a.photo)}" class="mt-2 w-20 h-20 object-cover rounded-lg border cursor-pointer" onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')">`:""}</div>`;
  modal(animalId?"Edit Animal":"Add Animal",formGrid(
   field("Animal ID","id",a.id,"text",animalId?"readonly":"")+
   field("Name / Nickname","name",a.name)+
@@ -815,7 +817,7 @@ function milkEntryTab(){
   ${!cows.length?`<div class="py-14 text-center text-stone-500">Koi female animal registered nahi hai. Pehle Animals module me cow add karein.</div>`:`
   <div class="overflow-auto"><table class="w-full text-sm" id="milkEntryTable">
    <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Morning (L)</th><th class="p-3 text-left">Evening (L)</th><th class="p-3 text-left">Total</th></tr></thead>
-   <tbody>${rows.map(({a,rec})=>`<tr class="border-b" data-animal="${esc(a.id)}"><td class="p-3"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0">${a.photo?`<img class="w-10 h-10 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}${a.status?" · "+esc(a.status):""}</span></div></div></td>
+   <tbody>${rows.map(({a,rec})=>`<tr class="border-b" data-animal="${esc(a.id)}"><td class="p-3"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0 ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-10 h-10 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}${a.status?" · "+esc(a.status):""}</span></div></div></td>
     <td class="p-3"><input ${viewOnly?"disabled":""} type="number" min="0" step="0.1" class="input !py-1.5 milk-morning" value="${rec&&rec.morning?rec.morning:""}" placeholder="0" oninput="updateMilkRowTotal(this)"></td>
     <td class="p-3"><input ${viewOnly?"disabled":""} type="number" min="0" step="0.1" class="input !py-1.5 milk-evening" value="${rec&&rec.evening?rec.evening:""}" placeholder="0" oninput="updateMilkRowTotal(this)"></td>
     <td class="p-3 row-total text-stone-600">${rec?((Number(rec.morning||0)+Number(rec.evening||0)).toFixed(1)+" L"):"—"}</td>
@@ -857,7 +859,7 @@ function milkHistoryTab(){
   ${!rows.length?`<div class="py-14 text-center text-stone-500">Abhi tak koi milk record nahi hai.</div>`:`
   <div class="overflow-auto"><table class="w-full text-sm">
    <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Date</th><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Morning</th><th class="p-3 text-left">Evening</th><th class="p-3 text-left">Total</th><th></th></tr></thead>
-   <tbody>${rows.map(x=>{const a=findAnimal(x.animalId);return `<tr class="border-b"><td class="p-3">${fmt(x.date)}</td><td class="p-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0">${a&&a.photo?`<img class="w-8 h-8 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(x.animalId)}</b><span class="block text-xs text-stone-500">${esc(a?.name||"")}</span></div></div></td><td class="p-3">${Number(x.morning||0).toFixed(1)} L</td><td class="p-3">${Number(x.evening||0).toFixed(1)} L</td><td class="p-3 font-semibold">${(Number(x.morning||0)+Number(x.evening||0)).toFixed(1)} L</td><td class="p-3 text-right">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('Milk','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Milk','${x.id}')">Delete</button></div>`}</td></tr>`}).join("")}</tbody>
+   <tbody>${rows.map(x=>{const a=findAnimal(x.animalId);return `<tr class="border-b"><td class="p-3">${fmt(x.date)}</td><td class="p-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0 ${a&&a.photo?"cursor-pointer":""}" ${a&&a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a&&a.photo?`<img class="w-8 h-8 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(x.animalId)}</b><span class="block text-xs text-stone-500">${esc(a?.name||"")}</span></div></div></td><td class="p-3">${Number(x.morning||0).toFixed(1)} L</td><td class="p-3">${Number(x.evening||0).toFixed(1)} L</td><td class="p-3 font-semibold">${(Number(x.morning||0)+Number(x.evening||0)).toFixed(1)} L</td><td class="p-3 text-right">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('Milk','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Milk','${x.id}')">Delete</button></div>`}</td></tr>`}).join("")}</tbody>
   </table></div>`}
  </div>`;
 }
@@ -921,7 +923,12 @@ function renderPage(){
 function saveCloudSettings(){state.cloud.name=document.querySelector('[name=cloudName]').value.trim();state.cloud.preset=document.querySelector('[name=cloudPreset]').value.trim();localStorage.cloudinaryName=state.cloud.name;localStorage.cloudinaryPreset=state.cloud.preset;toast("Cloudinary settings saved")}
 
 // ---- Photo capture + compression + Cloudinary upload ----
-function compressImage(file,maxDim=1280,quality=0.72){
+// Animal photos only ever display at 40-130px on screen, so there's no reason to keep
+// them at camera resolution (phone cameras shoot 8-12MP = 3-6MB originals). We resize to
+// a small max dimension AND step the JPEG quality down until the file is comfortably
+// under targetKB. This is what actually fixes "17 photos = 3-4MB" — that was happening
+// because the old settings (1280px @ quality 0.72) kept files around 200-400KB each.
+function compressImage(file,{maxDim=720,targetKB=90,minQuality=0.35}={}){
  return new Promise((resolve,reject)=>{
   const reader=new FileReader();
   reader.onerror=()=>reject(new Error("Could not read the selected file"));
@@ -933,8 +940,21 @@ function compressImage(file,maxDim=1280,quality=0.72){
     if(width>height&&width>maxDim){height=Math.round(height*maxDim/width);width=maxDim}
     else if(height>=width&&height>maxDim){width=Math.round(width*maxDim/height);height=maxDim}
     const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
-    const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,width,height);
-    canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("Image compression failed")),"image/jpeg",quality);
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#fff";ctx.fillRect(0,0,width,height); // flatten transparency, avoids black backgrounds on PNG->JPEG
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+    ctx.drawImage(img,0,0,width,height);
+    const qualities=[0.7,0.58,0.46,0.35];
+    let i=0;
+    (function tryQuality(){
+     canvas.toBlob(blob=>{
+      if(!blob){reject(new Error("Image compression failed"));return}
+      const doneOnSize=blob.size/1024<=targetKB;
+      const doneOnSteps=i>=qualities.length-1;
+      if(doneOnSize||doneOnSteps){resolve(blob);return}
+      i++;tryQuality();
+     },"image/jpeg",qualities[i]);
+    })();
    };
    img.src=e.target.result;
   };
@@ -947,6 +967,27 @@ function triggerPhotoInput(mode){
  if(mode==="camera")inp.setAttribute("capture","environment");else inp.removeAttribute("capture");
  inp.value="";inp.click();
 }
+// Uploads via XMLHttpRequest (not fetch) so we can show a live % progress bar — this is
+// what makes the wait feel faster on slow mobile connections, on top of the file itself
+// now being much smaller after compression.
+function uploadToCloudinary(blob,onProgress){
+ return new Promise((resolve,reject)=>{
+  const fd=new FormData();
+  fd.append("file",blob,"photo.jpg");
+  fd.append("upload_preset",state.cloud.preset);
+  fd.append("folder","gaushala/animals");
+  const xhr=new XMLHttpRequest();
+  xhr.open("POST",`https://api.cloudinary.com/v1_1/${state.cloud.name}/image/upload`);
+  xhr.upload.onprogress=ev=>{if(ev.lengthComputable&&onProgress)onProgress(Math.round(ev.loaded/ev.total*100))};
+  xhr.onload=()=>{
+   let data;try{data=JSON.parse(xhr.responseText)}catch{data=null}
+   if(xhr.status>=200&&xhr.status<300&&data)resolve(data);
+   else reject(new Error(data?.error?.message||"Cloudinary upload failed"));
+  };
+  xhr.onerror=()=>reject(new Error("Network error during upload — check your internet connection"));
+  xhr.send(fd);
+ });
+}
 async function handlePhotoSelected(e){
  const file=e.target.files&&e.target.files[0];
  e.target.value="";
@@ -957,25 +998,39 @@ async function handlePhotoSelected(e){
   if(statusEl)statusEl.innerHTML=`<span class="spinner border-stone-400"></span> Compressing image...`;
   const originalKb=(file.size/1024).toFixed(0);
   const blob=await compressImage(file);
-  if(statusEl)statusEl.innerHTML=`<span class="spinner border-stone-400"></span> Uploading (${fmtBytes(blob.size)}, was ${originalKb} KB)...`;
-  const fd=new FormData();
-  fd.append("file",blob,"photo.jpg");
-  fd.append("upload_preset",state.cloud.preset);
-  fd.append("folder","gaushala/animals");
-  const res=await fetch(`https://api.cloudinary.com/v1_1/${state.cloud.name}/image/upload`,{method:"POST",body:fd});
-  const data=await res.json();
-  if(!res.ok)throw new Error(data?.error?.message||"Cloudinary upload failed");
+  if(statusEl)statusEl.innerHTML=`<span class="spinner border-stone-400"></span> Uploading ${fmtBytes(blob.size)} (was ${fmtBytes(file.size)}) — <span id="uploadPct">0%</span>`;
+  const data=await uploadToCloudinary(blob,pct=>{const p=document.getElementById("uploadPct");if(p)p.textContent=pct+"%"});
   window.currentPhoto=data.secure_url;
-  if(statusEl)statusEl.textContent=`Uploaded ✓ (${fmtBytes(blob.size)}, compressed from ${originalKb} KB)`;
+  if(statusEl)statusEl.textContent=`Uploaded ✓ ${fmtBytes(blob.size)} (compressed from ${fmtBytes(file.size)}). Tap the photo below to view full size.`;
   const wrap=document.getElementById("photoPreviewWrap");
-  if(wrap)wrap.innerHTML=`<img id="photoPreview" src="${esc(data.secure_url)}" class="mt-2 w-20 h-20 object-cover rounded-lg border">`;
+  if(wrap)wrap.innerHTML=`<img id="photoPreview" src="${esc(data.secure_url)}" class="mt-2 w-20 h-20 object-cover rounded-lg border cursor-pointer" onclick="viewPhoto('${esc(data.secure_url)}','Photo')">`;
   toast("Photo uploaded");
   await db.ref("mediaLog/"+id("MED")).set({publicId:data.public_id,url:data.secure_url,bytes:blob.size,createdAt:new Date().toISOString()});
  }catch(err){
-  if(statusEl)statusEl.textContent="Upload failed — try again";
+  if(statusEl)statusEl.textContent="Upload failed — try again ("+err.message+")";
   toast(err.message,false);
  }
 }
+// Full-size photo viewer — tap any animal photo (table row, form preview, bio profile,
+// family tree, milk entry) to open it large. This is the "photo pe tap karke dekhna" feature.
+function viewPhoto(url,label){
+ if(!url)return;
+ document.getElementById("modalRoot").innerHTML=`<div class="modal-bg fixed inset-0 z-[60] p-4 flex items-center justify-center" onclick="if(event.target===this)closeModal()">
+  <div class="max-w-lg w-full">
+   <div class="bg-white rounded-2xl overflow-hidden shadow-2xl">
+    <div class="relative bg-black"><img src="${esc(url)}" class="w-full max-h-[70vh] object-contain mx-auto"></div>
+    <div class="p-3 flex items-center justify-between gap-2">
+     <span class="text-sm font-semibold truncate">${esc(label||"Photo")}</span>
+     <div class="flex gap-2 shrink-0">
+      <a class="btn btn-soft !py-1.5 !px-3" href="${esc(url)}" target="_blank" rel="noopener">Open</a>
+      <button class="btn btn-primary !py-1.5 !px-3" onclick="closeModal()">Close</button>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>`;
+}
+window.viewPhoto=viewPhoto;
 
 const REPORT_CONFIGS={
  "Animal Master":{rows:()=>animals(),columns:[["Animal ID","id"],["Name","name"],["Gender","gender"],["Type","type"],["Breed","breed"],["Status","status"],["Shed","shed"],["DOB","dob"],["Joined","joinedDate"]]},
