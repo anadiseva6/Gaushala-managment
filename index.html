@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <meta name="theme-color" content="#14532d"/>
   <title>Gaushala Management System</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -19,11 +19,24 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    :root{--ink:#26401c;--ink-soft:#5b6b52;--line:#e3e0d4;--surface:#ffffff;--bg:#f4f2ea;--accent:#47752b;--accent-dark:#2e4a1f;--focus:#c1652f}
+    :root{--ink:#26401c;--ink-soft:#5b6b52;--line:#e3e0d4;--surface:#ffffff;--bg:#f4f2ea;--accent:#47752b;--accent-dark:#2e4a1f;--focus:#c1652f;--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);--safe-l:env(safe-area-inset-left,0px);--safe-r:env(safe-area-inset-right,0px)}
     *{font-family:'Manrope',sans-serif}
     h1,h2,h3,.font-display{font-family:'Fraunces',serif}
-    body{background:var(--bg);color:var(--ink)}
+    html{-webkit-text-size-adjust:100%}
+    html,body{overflow-x:hidden;max-width:100vw}
+    body{background:var(--bg);color:var(--ink);-webkit-tap-highlight-color:transparent}
+    button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
     ::selection{background:#dbe9cd}
+    /* Mobile-safety: iOS auto-zooms any input/select under 16px on focus, which feels
+       broken/jerky on a phone. Force 16px specifically on touch-sized screens, while
+       keeping the tighter desktop sizing untouched. */
+    @media (max-width:767px){
+      .input,select.input,textarea.input,input{font-size:16px!important}
+      .btn{font-size:.86rem}
+    }
+    /* Any horizontally-scrollable strip (tables, family tree, alerts) should feel like a
+       native scroller on touch, not a jerky/clipped patch. */
+    .overflow-auto,.scrollbar{-webkit-overflow-scrolling:touch}
     .scrollbar::-webkit-scrollbar{width:8px;height:8px}.scrollbar::-webkit-scrollbar-thumb{background:#d6d2c2;border-radius:20px}.scrollbar::-webkit-scrollbar-track{background:transparent}
     :focus-visible{outline:2.5px solid var(--focus);outline-offset:2px;border-radius:6px}
     .nav-active{background:var(--accent-dark);color:#fff;font-weight:700;box-shadow:0 2px 10px rgba(46,74,31,.28)}
@@ -97,11 +110,52 @@
     .bio-log-item{border-left:2px solid #dcdfd0;padding:2px 0 10px 14px;position:relative;font-size:.85rem}
     .bio-log-item::before{content:"";position:absolute;left:-5px;top:4px;width:8px;height:8px;border-radius:999px;background:var(--accent)}
     .bio-log-item:last-child{border-color:transparent}
+
+    /* ---- Responsive tables ("rtable") ----
+       Every data table on a small screen turns into a stack of cards instead of a tiny
+       horizontally-scrolled grid — nothing to pinch-zoom, nothing cut off. Each <td> shows
+       its column name via data-label; the first/identity cell (marked rt-main) becomes the
+       card's title, and the actions cell (rt-actions) drops its label and right-aligns. */
+    @media (max-width:719px){
+      .rtable{overflow:visible!important}
+      .rtable table,.rtable thead,.rtable tbody,.rtable tr,.rtable th,.rtable td{display:block}
+      .rtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+      .rtable tbody{display:flex;flex-direction:column;gap:10px}
+      .rtable tr{border:1px solid var(--line);border-radius:12px;padding:2px 12px;background:#fff}
+      .rtable td{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px dashed #ece9dc;text-align:right;min-height:26px}
+      .rtable tr td:last-child{border-bottom:0}
+      .rtable td::before{content:attr(data-label);font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);text-align:left;flex-shrink:0}
+      .rtable td.rt-main{display:block;text-align:left;padding:12px 0 10px;font-size:.98rem}
+      .rtable td.rt-main::before{content:none}
+      .rtable td.rt-actions{justify-content:flex-end}
+      .rtable td.rt-actions::before{content:none}
+      .rtable td.rt-actions>div{width:100%}
+      .rtable td.rt-actions .flex{width:100%;justify-content:flex-end}
+      .rtable td input.input,.rtable td select.input{max-width:150px;margin-left:auto;text-align:right}
+      .rtable td>span.badge{margin-left:auto}
+    }
+
+    /* ---- Toast: full-width, thumb-reachable, respects notch/home-indicator ---- */
+    #toast{left:1rem;right:1rem;bottom:calc(1.1rem + var(--safe-b));display:flex;justify-content:center;pointer-events:none}
+    #toast .toast{pointer-events:auto;max-width:480px;width:100%}
+    @media (min-width:640px){#toast{left:auto}}
+
+    /* ---- Modal: comfortable on small phones, sticky bars respect safe areas ---- */
+    @media (max-width:640px){
+      .modal-bg{padding:.6rem!important;align-items:flex-end!important}
+      .modal-bg>div{max-height:88vh!important;border-radius:18px 18px 0 0!important;width:100%!important}
+      .modal-actions{flex-direction:column-reverse!important;align-items:stretch!important}
+      .modal-actions .btn{width:100%}
+    }
+    #modalRoot .p-5.border-t{padding-bottom:calc(1.25rem + var(--safe-b))}
+
+    /* ---- Sidebar drawer: never wider than the viewport on very small phones ---- */
+    #side{width:min(288px,86vw)}
   </style>
 </head>
 <body class="text-slate-800">
 <div id="app"></div>
-<div id="toast" class="fixed bottom-5 right-5 z-[100]"></div>
+<div id="toast" class="fixed z-[100]"></div>
 <div id="modalRoot"></div>
 
 <script>
@@ -144,6 +198,10 @@ function isModuleHidden(m){
  return !!(p.hiddenModules&&p.hiddenModules.includes(m));
 }
 function isModuleViewOnly(m){const p=currentPermissions();return !!(p&&p.viewOnly&&p.viewOnly.includes(m))}
+// Some record "types" used with the generic openRecord/deleteRecord/genericTable helpers
+// aren't real nav modules (e.g. MilkSources lives inside the Milk page), so their
+// permission check should fall back to whichever nav module they logically belong to.
+function permModule(type){return {MilkSources:"Milk"}[type]||type}
 function loginScreen(){
  document.getElementById("app").innerHTML=`<div class="min-h-screen flex items-center justify-center p-4" style="background:radial-gradient(1200px 600px at 15% -10%, #eef1e0 0%, var(--bg) 55%)">
   <div class="w-full max-w-md">
@@ -170,11 +228,24 @@ function loginScreen(){
  </div>`;
 }
 function attemptLogin(role){
- if(role==="Owner"){
-  const pass=prompt("Owner password daalein:");
-  if(pass===null)return;
-  if(pass!==OWNER_PASSWORD){toast("Galat password",false);return}
- }
+ if(role==="Owner"){ownerPasswordModal();return}
+ finishLogin(role);
+}
+function ownerPasswordModal(){
+ modal("👑 Owner Login",
+  `<label class="block text-sm font-semibold text-slate-600">Password<input type="password" inputmode="text" autocomplete="current-password" class="input mt-1" id="ownerPass" placeholder="Owner password daalein" onkeydown="if(event.key==='Enter')submitOwnerPassword()"></label>
+   <label class="flex items-center gap-2 mt-3 text-sm" style="color:var(--ink-soft)"><input type="checkbox" onchange="document.getElementById('ownerPass').type=this.checked?'text':'password'"> Show password</label>`,
+  `<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitOwnerPassword()">Login</button>`
+ );
+ setTimeout(()=>document.getElementById("ownerPass")?.focus(),50);
+}
+function submitOwnerPassword(){
+ const pass=document.getElementById("ownerPass")?.value||"";
+ if(pass!==OWNER_PASSWORD){toast("Galat password",false);return}
+ closeModal();
+ finishLogin("Owner");
+}
+function finishLogin(role){
  state.role=role;
  localStorage.gaushalaRole=role;
  localStorage.gaushalaLoggedIn="1";
@@ -193,7 +264,7 @@ function infoIcon(text){
 document.addEventListener("click",e=>{
  document.querySelectorAll("details.info[open]").forEach(d=>{if(!d.contains(e.target))d.removeAttribute("open")});
 });
-const paths=["animals","pregnancies","calvings","milkRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","feedRecords","feedPurchases","feedUsage","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog"];
+const paths=["animals","pregnancies","calvings","milkRecords","milkSources","milkInsourceRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","feedRecords","feedPurchases","feedUsage","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog"];
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function id(prefix){return prefix+"-"+Math.random().toString(36).slice(2,7).toUpperCase()}
@@ -235,6 +306,8 @@ async function remove(path,key){if(!path){toast("Could not delete: unknown recor
 function list(path){return Object.values(state.data[path]||{})}
 function animals(){return list("animals")}
 function findAnimal(id){return animals().find(a=>a.id===id)}
+function milkSources(){return list("milkSources")}
+function findMilkSource(id){return milkSources().find(s=>s.id===id)}
 
 // ============ QR CODE / EAR TAG SYSTEM ============
 // The QR encodes a link back to this same page with ?tag=<animalId>. Scanning it (any
@@ -387,7 +460,7 @@ function renderPublicProfile(animalId){
  const bio=buildAnimalBio(animalId);
  document.getElementById("app").innerHTML=bio?publicProfileHTML(bio):`<div class="min-h-screen flex items-center justify-center p-6"><div class="card p-8 text-center max-w-sm"><div class="text-4xl mb-3">🐄</div><h1 class="font-display text-xl font-semibold">Animal nahi mila</h1><p class="text-sm text-stone-500 mt-2">ID "${esc(animalId)}" ka koi record nahi mila. QR tag purana ho sakta hai ya animal delete ho gaya ho.</p><a href="${location.origin+location.pathname}" class="btn btn-primary mt-4 inline-flex">Open full app</a></div></div>`;
 }
-function modal(title,body,actions=""){document.getElementById("modalRoot").innerHTML=`<div class="modal-bg fixed inset-0 z-50 p-4 flex items-center justify-center" onclick="if(event.target===this)closeModal()"><div class="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-auto scrollbar shadow-2xl" role="dialog" aria-modal="true" aria-label="${title.replace(/"/g,'')}"><div class="p-5 border-b flex justify-between items-center sticky top-0 bg-white z-10" style="border-color:var(--line)"><h3 class="font-display font-semibold text-xl" style="color:var(--ink)">${title}</h3><button onclick="closeModal()" class="text-2xl w-9 h-9 rounded-full hover:bg-black/5 grid place-items-center leading-none" style="color:var(--ink-soft)" aria-label="Close dialog">×</button></div><div class="p-5">${body}</div>${actions?`<div class="p-5 border-t flex flex-wrap justify-end gap-2 sticky bottom-0 bg-white" style="border-color:var(--line)">${actions}</div>`:""}</div></div>`}
+function modal(title,body,actions=""){document.getElementById("modalRoot").innerHTML=`<div class="modal-bg fixed inset-0 z-50 p-4 flex items-center justify-center" onclick="if(event.target===this)closeModal()"><div class="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-auto scrollbar shadow-2xl" role="dialog" aria-modal="true" aria-label="${title.replace(/"/g,'')}"><div class="p-4 sm:p-5 border-b flex justify-between items-center gap-3 sticky top-0 bg-white z-10" style="border-color:var(--line)"><h3 class="font-display font-semibold text-lg sm:text-xl truncate" style="color:var(--ink)">${title}</h3><button onclick="closeModal()" class="text-2xl w-10 h-10 rounded-full hover:bg-black/5 grid place-items-center leading-none shrink-0" style="color:var(--ink-soft)" aria-label="Close dialog">×</button></div><div class="p-4 sm:p-5">${body}</div>${actions?`<div class="modal-actions p-4 sm:p-5 border-t flex flex-wrap justify-end gap-2 sticky bottom-0 bg-white" style="border-color:var(--line)">${actions}</div>`:""}</div></div>`}
 function closeModal(){document.getElementById("modalRoot").innerHTML=""}
 // Har form field ka matlab (chhota ho ya bada) — field()/select() dono is dictionary ko
 // naam (name=) se lookup karke ek ⓘ icon dikha dete hain, taaki poore app mein kahin bhi
@@ -450,7 +523,9 @@ const FIELD_MEANINGS={
  cloudPreset:"Cloudinary ka unsigned upload preset naam.",
  dewormDays:"Deworming dobara kitne dino baad due honi chahiye.",
  tickDays:"Tick control spray dobara kitne dino baad due honi chahiye.",
- nailDays:"Nail cutting dobara kitne dino baad due honi chahiye."
+ nailDays:"Nail cutting dobara kitne dino baad due honi chahiye.",
+ sourceName:"Doodh insource (bahar se khareed/le) karne wale vyakti, vendor ya dairy ka naam.",
+ contact:"Us insource source ka contact number (optional)."
 };
 function field(label,name,value="",type="text",extra=""){const hint=FIELD_MEANINGS[name];return `<label class="block text-sm font-semibold text-slate-600">${label}${hint?infoIcon(hint):""}<input ${extra} class="input mt-1" name="${name}" type="${type}" value="${esc(value)}"></label>`}
 function select(label,name,opts,value="",extra=""){const hint=FIELD_MEANINGS[name];return `<label class="block text-sm font-semibold text-slate-600">${label}${hint?infoIcon(hint):""}<select ${extra} class="input mt-1" name="${name}">${opts.map(o=>`<option ${o===value?"selected":""}>${esc(o)}</option>`).join("")}</select></label>`}
@@ -534,16 +609,16 @@ function nav(){
 function renderShell(){
  document.getElementById("app").innerHTML=`<div class="min-h-screen flex">
  <button aria-hidden="true" onclick="toggleSide()" class="fixed inset-0 bg-black/30 z-30 lg:hidden hidden" id="sideOverlay"></button>
- <aside id="side" class="fixed z-40 inset-y-0 left-0 w-72 border-r -translate-x-full lg:translate-x-0 transition-transform" style="background:var(--accent-dark)">
-  <div class="h-20 px-5 flex items-center gap-3 border-b border-white/10"><div class="w-11 h-11 rounded-xl bg-white/10 grid place-items-center text-2xl">🐄</div><div><b class="block font-display text-lg text-white tracking-wide">Gaushala</b><span class="text-xs text-white/50">Management System · ${APP_VERSION}</span></div><button class="lg:hidden ml-auto text-white/70 text-2xl leading-none" onclick="toggleSide()" aria-label="Close menu">×</button></div>
-  <div class="p-3 h-[calc(100vh-80px)] overflow-auto scrollbar space-y-0.5" style="color:#dfe6d2">${nav()}</div>
+ <aside id="side" class="fixed z-40 inset-y-0 left-0 border-r -translate-x-full lg:translate-x-0 transition-transform" style="background:var(--accent-dark);padding-top:var(--safe-t)">
+  <div class="h-20 px-4 sm:px-5 flex items-center gap-3 border-b border-white/10"><div class="w-11 h-11 rounded-xl bg-white/10 grid place-items-center text-2xl shrink-0">🐄</div><div class="min-w-0"><b class="block font-display text-lg text-white tracking-wide truncate">Gaushala</b><span class="text-xs text-white/50">Management System · ${APP_VERSION}</span></div><button class="lg:hidden ml-auto text-white/70 text-2xl leading-none w-9 h-9 grid place-items-center shrink-0" onclick="toggleSide()" aria-label="Close menu">×</button></div>
+  <div class="p-3 overflow-auto scrollbar space-y-0.5" style="color:#dfe6d2;height:calc(100vh - 80px - var(--safe-t))">${nav()}</div>
  </aside>
  <main class="lg:ml-72 min-h-screen w-full">
-  <header class="sticky top-0 z-20 h-20 bg-white/95 backdrop-blur border-b px-4 lg:px-8 flex items-center justify-between gap-3" style="border-color:var(--line)">
-   <div class="flex items-center gap-3 min-w-0"><button class="lg:hidden text-2xl shrink-0" onclick="toggleSide()" aria-label="Open menu">☰</button><div class="min-w-0"><div class="text-xs" style="color:var(--ink-soft)">${new Date().toLocaleDateString("en-IN",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div><h1 class="font-display font-semibold text-2xl truncate">${esc(state.page)}</h1></div></div>
-   <div class="flex items-center gap-2 shrink-0"><div class="hidden md:flex items-center border rounded-xl px-3 bg-white" style="border-color:var(--line)"><span aria-hidden="true" style="color:var(--ink-soft)">⌕</span><input class="bg-transparent outline-none p-2 w-56 text-sm" placeholder="Search this page..." aria-label="Search" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div><span class="hidden sm:inline text-xs font-bold px-3 py-2 rounded-xl" style="color:var(--accent-dark);background:#eef1e6">${esc(state.role)}</span><button class="btn btn-soft !px-3" onclick="logout()">Logout</button><div class="w-10 h-10 rounded-full text-white grid place-items-center font-bold shrink-0" style="background:var(--accent-dark)" aria-hidden="true">${esc((state.role||"A")[0])}</div></div>
+  <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b px-3 sm:px-4 lg:px-8 flex items-center justify-between gap-2 sm:gap-3" style="border-color:var(--line);padding-top:calc(.9rem + var(--safe-t));padding-bottom:.9rem;min-height:80px">
+   <div class="flex items-center gap-2 sm:gap-3 min-w-0"><button class="lg:hidden text-2xl shrink-0 w-9 h-9 grid place-items-center -ml-1" onclick="toggleSide()" aria-label="Open menu">☰</button><div class="min-w-0"><div class="text-xs hidden sm:block" style="color:var(--ink-soft)">${new Date().toLocaleDateString("en-IN",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div><h1 class="font-display font-semibold text-lg sm:text-2xl truncate">${esc(state.page)}</h1></div></div>
+   <div class="flex items-center gap-1.5 sm:gap-2 shrink-0"><div class="hidden md:flex items-center border rounded-xl px-3 bg-white" style="border-color:var(--line)"><span aria-hidden="true" style="color:var(--ink-soft)">⌕</span><input class="bg-transparent outline-none p-2 w-56 text-sm" placeholder="Search this page..." aria-label="Search" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div><span class="hidden sm:inline text-xs font-bold px-3 py-2 rounded-xl" style="color:var(--accent-dark);background:#eef1e6">${esc(state.role)}</span><button class="btn btn-soft !px-2.5 sm:!px-3 shrink-0" onclick="logout()"><span class="hidden sm:inline">Logout</span><span class="sm:hidden">⎋</span></button><div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full text-white grid place-items-center font-bold shrink-0" style="background:var(--accent-dark)" aria-hidden="true">${esc((state.role||"A")[0])}</div></div>
   </header>
-  <section id="content" class="p-4 lg:p-8 max-w-[1600px] mx-auto"></section>
+  <section id="content" class="p-3 sm:p-4 lg:p-8 max-w-[1600px] mx-auto"></section>
  </main></div>`;
  renderPage();
 }
@@ -624,7 +699,7 @@ function dashboard(){
  </div>
  ${deceased.length?`<div class="mb-5 text-xs flex items-center gap-2" style="color:var(--ink-soft)">🕊️ ${deceased.length} deceased record(s) archived — not counted in totals. <button class="font-semibold underline" style="color:var(--accent-dark)" onclick="state.animalFilter='deceased';go('Animals')">View →</button></div>`:`<div class="mb-5"></div>`}
  <div class="grid lg:grid-cols-3 gap-5 mb-5">
-  <div class="card p-5 lg:col-span-2"><h3 class="font-display font-semibold text-lg">Today's Snapshot</h3><div class="grid md:grid-cols-3 gap-3 mt-4">
+  <div class="card p-5 lg:col-span-2"><h3 class="font-display font-semibold text-lg">Today's Snapshot</h3><div class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
    <div class="rounded-xl p-4" style="background:#f4f2ea"><span class="text-xs font-semibold" style="color:var(--ink-soft)">Milk today</span><b class="font-display block text-2xl mt-1">${milkToday.toFixed(1)} L</b></div>
    <div class="rounded-xl p-4" style="background:#f4f2ea"><span class="text-xs font-semibold" style="color:var(--ink-soft)">Calving in 30 days</span><b class="font-display block text-2xl mt-1">${preg.filter(x=>x.expectedCalvingDate&&daysTo(x.expectedCalvingDate)>=0&&daysTo(x.expectedCalvingDate)<=30).length}</b></div>
    <div class="rounded-xl p-4 bg-red-50"><span class="text-xs font-semibold text-red-700">Overdue calving</span><b class="font-display block text-2xl mt-1 text-red-700">${preg.filter(x=>x.expectedCalvingDate&&daysTo(x.expectedCalvingDate)<0).length}</b></div>
@@ -640,7 +715,7 @@ function dashboard(){
 function animalTable(arr){
  if(!arr.length)return `<div class="py-12 text-center text-stone-500">No animals found.</div>`;
  const viewOnly=isModuleViewOnly("Animals");
- return `<div class="overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-stone-500 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3">${esc(a.gender)}</td><td class="p-3">${esc(a.type)}</td><td class="p-3">${esc(a.breed||"—")}</td><td class="p-3">${badge(a.status)}</td><td class="p-3">${esc(a.shed||"—")}</td><td class="p-3 text-right"><div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" title="Print QR ear-tag" onclick="printAnimalTag('${esc(a.id)}')">🔖 QR</button>${viewOnly?"":`<button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button><button class="btn btn-danger !p-2" onclick="deleteAnimal('${esc(a.id)}')">Delete</button>`}</div></td></tr>`).join("")}</tbody></table></div>`
+ return `<div class="rtable overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-stone-500 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3 rt-main"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3" data-label="Gender">${esc(a.gender)}</td><td class="p-3" data-label="Type">${esc(a.type)}</td><td class="p-3" data-label="Breed">${esc(a.breed||"—")}</td><td class="p-3" data-label="Status">${badge(a.status)}</td><td class="p-3" data-label="Shed">${esc(a.shed||"—")}</td><td class="p-3 text-right rt-actions"><div class="flex gap-2 justify-end flex-wrap"><button class="btn btn-soft !p-2" title="Print QR ear-tag" onclick="printAnimalTag('${esc(a.id)}')">🔖 QR</button>${viewOnly?"":`<button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button><button class="btn btn-danger !p-2" onclick="deleteAnimal('${esc(a.id)}')">Delete</button>`}</div></td></tr>`).join("")}</tbody></table></div>`
 }
 // Every path where a record can reference an animal via its "animalId" field.
 // When an animal is deleted, all of its records across these modules are deleted too.
@@ -736,7 +811,7 @@ async function submitAnimal(existing){
 function pregnancyPage(){
  let rows=list("pregnancies").sort((a,b)=>(a.expectedCalvingDate||"").localeCompare(b.expectedCalvingDate||""));
  return pageHeader("Pregnancy & Calving","Breeding date + 283 days se expected calving automatically calculate hota hai.",`<button class="btn btn-primary" onclick="openPregnancy()">＋ Record Pregnancy</button>`,"Jab cow ko AI ya natural mating karayi jaaye, uski breeding date yahan daalein — app khud expected calving date nikaal degi (283 din baad) aur cow ka status 'Pregnant' ho jayega.")
- +`<div class="grid md:grid-cols-3 gap-3 mb-5">${stat("Pregnant records",rows.length,"🤰")}${stat("Due ≤30 days",rows.filter(x=>daysTo(x.expectedCalvingDate)>=0&&daysTo(x.expectedCalvingDate)<=30).length,"📅")}${stat("Overdue",rows.filter(x=>daysTo(x.expectedCalvingDate)<0).length,"⏰")}</div><div class="card p-5 overflow-auto">${rows.length?`<table class="w-full text-sm"><thead><tr class="border-b text-xs text-stone-500 uppercase"><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Breeding</th><th class="p-3 text-left">Expected</th><th class="p-3 text-left">Days</th><th class="p-3 text-left">Status</th></tr></thead><tbody>${rows.map(x=>{let d=daysTo(x.expectedCalvingDate);return `<tr class="border-b"><td class="p-3"><b>${esc(x.animalId)}</b><span class="block text-xs text-stone-500">${esc(findAnimal(x.animalId)?.name||"")}</span></td><td class="p-3">${fmt(x.breedingDate)}</td><td class="p-3 font-semibold">${fmt(x.expectedCalvingDate)}</td><td class="p-3">${d<0?`${Math.abs(d)} days overdue`:d===0?"Today":`${d} days`}</td><td class="p-3">${badge(d<0?"Overdue":d<=30?"Pregnant":"Tracked")}</td></tr>`}).join("")}</tbody></table>`:"<div class='py-12 text-center text-stone-500'>No pregnancy records yet.</div>"}</div>`
+ +`<div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">${stat("Pregnant records",rows.length,"🤰")}${stat("Due ≤30 days",rows.filter(x=>daysTo(x.expectedCalvingDate)>=0&&daysTo(x.expectedCalvingDate)<=30).length,"📅")}${stat("Overdue",rows.filter(x=>daysTo(x.expectedCalvingDate)<0).length,"⏰")}</div><div class="card p-5 rtable overflow-auto">${rows.length?`<table class="w-full text-sm"><thead><tr class="border-b text-xs text-stone-500 uppercase"><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Breeding</th><th class="p-3 text-left">Expected</th><th class="p-3 text-left">Days</th><th class="p-3 text-left">Status</th></tr></thead><tbody>${rows.map(x=>{let d=daysTo(x.expectedCalvingDate);return `<tr class="border-b"><td class="p-3 rt-main"><b>${esc(x.animalId)}</b><span class="block text-xs text-stone-500">${esc(findAnimal(x.animalId)?.name||"")}</span></td><td class="p-3" data-label="Breeding">${fmt(x.breedingDate)}</td><td class="p-3 font-semibold" data-label="Expected">${fmt(x.expectedCalvingDate)}</td><td class="p-3" data-label="Days">${d<0?`${Math.abs(d)} days overdue`:d===0?"Today":`${d} days`}</td><td class="p-3" data-label="Status">${badge(d<0?"Overdue":d<=30?"Pregnant":"Tracked")}</td></tr>`}).join("")}</tbody></table>`:"<div class='py-12 text-center text-stone-500'>No pregnancy records yet.</div>"}</div>`
 }
 function openPregnancy(){
  if(isModuleHidden("Pregnancy")){toast(`${state.role} role ke paas Pregnancy ka access nahi hai`,false);return}
@@ -776,11 +851,11 @@ function simplePage(type){
  const c=configs[type];let rows=list(c[2]);if(state.search){let q=state.search.toLowerCase();rows=rows.filter(x=>JSON.stringify(x).toLowerCase().includes(q))}
  const headerBtn=isModuleViewOnly(type)?"":`<div class="flex gap-2">${type==="Calves"?`<button class="btn btn-soft" onclick="repairCalfLinks()">🔧 Fix Missing Calf Links</button>`:""}<button class="btn btn-primary" onclick="openRecord('${type}')">${c[3]}</button></div>`;
  return pageHeader(c[0],c[1],headerBtn,c[4])
- +`<div class="card p-5"><div class="flex items-center justify-between mb-4"><span class="text-sm text-stone-600">${rows.length} records</span><input class="input !w-64" placeholder="Filter records" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div>${genericTable(type,rows)}</div>`
+ +`<div class="card p-5"><div class="flex items-center justify-between mb-4 gap-3 flex-wrap"><span class="text-sm text-stone-600">${rows.length} records</span><input class="input !w-64 max-w-full flex-1 sm:flex-none" placeholder="Filter records" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div>${genericTable(type,rows)}</div>`
 }
 function genericTable(type,rows){
  if(!rows.length)return `<div class="py-14 text-center text-stone-500">No records yet. Add the first record.</div>`;
- const viewOnly=isModuleViewOnly(type);
+ const viewOnly=isModuleViewOnly(permModule(type));
  // NOTE: Firebase returns object keys in alphabetical order, not insertion order — so we
  // must build columns from recordFields (the order YOU defined the form in), not from
  // Object.keys(rows[0]). This is what was making table columns look scrambled/wrong.
@@ -788,9 +863,9 @@ function genericTable(type,rows){
  const cols=fieldDefs
    ?fieldDefs.map(f=>({key:f[0],label:f[1]}))
    :Object.keys(rows[0]).filter(k=>!["id","updatedAt","createdAt"].includes(k)).slice(0,6).map(k=>({key:k,label:k.replace(/([A-Z])/g," $1")}));
- return `<div class="overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-stone-500">${cols.map(c=>`<th class="p-3 text-left"${FIELD_MEANINGS[c.key]?` title="${esc(FIELD_MEANINGS[c.key])}"`:""}>${esc(c.label)}</th>`).join("")}<th></th></tr></thead><tbody>${rows.slice(0,100).map(x=>`<tr class="border-b">${cols.map(c=>`<td class="p-3">${c.key.toLowerCase().includes("date")?fmt(x[c.key]):c.key==="status"?badge(x[c.key]):esc(x[c.key])}</td>`).join("")}<td class="p-3 text-right">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('${type}','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('${type}','${x.id}')">Delete</button></div>`}</td></tr>`).join("")}</tbody></table></div>`
+ return `<div class="rtable overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-stone-500">${cols.map((c,i)=>`<th class="p-3 text-left"${FIELD_MEANINGS[c.key]?` title="${esc(FIELD_MEANINGS[c.key])}"`:""}>${esc(c.label)}</th>`).join("")}<th></th></tr></thead><tbody>${rows.slice(0,100).map(x=>`<tr class="border-b">${cols.map((c,i)=>`<td class="p-3${i===0?" rt-main":""}" data-label="${esc(c.label)}">${c.key.toLowerCase().includes("date")?fmt(x[c.key]):c.key==="status"?badge(x[c.key]):esc(x[c.key])}</td>`).join("")}<td class="p-3 text-right rt-actions">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('${type}','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('${type}','${x.id}')">Delete</button></div>`}</td></tr>`).join("")}</tbody></table></div>`
 }
-const recordPaths={Calves:"births",Health:"healthChecks",Medicines:"medicines",Vaccination:"vaccinations",Deworming:"deworming","Tick Control":"tickControl","Nail Cutting":"nailCutting",Feed:"feedInventory",Sheds:"sheds",Workers:"workers",Tasks:"tasks",Expenses:"expenses",Milk:"milkRecords"};
+const recordPaths={Calves:"births",Health:"healthChecks",Medicines:"medicines",Vaccination:"vaccinations",Deworming:"deworming","Tick Control":"tickControl","Nail Cutting":"nailCutting",Feed:"feedInventory",Sheds:"sheds",Workers:"workers",Tasks:"tasks",Expenses:"expenses",Milk:"milkRecords",MilkSources:"milkSources"};
 const recordFields={
  Calves:[["animalId","Mother ID","text",true],["calfId","Calf ID (optional, auto-generated if blank)","text"],["birthDate","Birth Date","date"],["gender","Gender","select:Male|Female"],["birthWeight","Birth Weight (kg)","number"],["notes","Notes","text"]],
  Health:[["animalId","Animal ID","text",true],["date","Date","date"],["status","Status","select:Normal|Watch|Sick|Emergency"],["temperature","Temperature","number"],["remarks","Remarks","text"]],
@@ -804,12 +879,13 @@ const recordFields={
  Workers:[["name","Name","text"],["phone","Phone","text"],["role","Role","select:Worker|Manager|Veterinarian"],["shed","Assigned Shed","text"],["joiningDate","Joining Date","date"]],
  Tasks:[["title","Task","text"],["assignedTo","Assigned Worker","text"],["date","Date","date"],["priority","Priority","select:Low|Normal|High|Urgent"],["status","Status","select:Pending|In Progress|Completed|Skipped"],["notes","Notes","text"]],
  Expenses:[["date","Date","date"],["category","Category","select:Green fodder|Dry fodder|Concentrate|Medicine|Veterinary|Labour|Electricity|Water|Repair|Transport|Equipment|Other"],["amount","Amount","number"],["vendor","Vendor","text"],["paymentMethod","Payment Method","select:Cash|UPI|Bank|Other"],["notes","Notes","text"]],
- Milk:[["animalId","Cow","text",true],["date","Date","date"],["morning","Morning (L)","number"],["evening","Evening (L)","number"],["notes","Notes","text"]]
+ Milk:[["animalId","Cow","text",true],["date","Date","date"],["morning","Morning (L)","number"],["evening","Evening (L)","number"],["notes","Notes","text"]],
+ MilkSources:[["sourceName","Source Name (vyakti / vendor / dairy)","text"],["contact","Contact / Phone","text"],["notes","Notes","text"]]
 };
 function openRecord(type,key){
  const fields=recordFields[type];
  if(!fields){toast(`Unknown record type: ${type}`,false);return}
- if(isModuleHidden(type)||isModuleViewOnly(type)){toast(`${state.role} role ke paas is action ki permission nahi hai`,false);return}
+ if(isModuleHidden(permModule(type))||isModuleViewOnly(permModule(type))){toast(`${state.role} role ke paas is action ki permission nahi hai`,false);return}
  const existing=key?list(recordPaths[type]).find(r=>r.id===key):null;
  let html=formGrid(fields.map(([n,l,t,isAnimal])=>{
    if(t.startsWith("select:"))return select(l,n,t.slice(7).split("|"),existing?existing[n]:"");
@@ -878,47 +954,33 @@ async function repairCalfLinks(){
  try{await Promise.all(ops);toast(`${fixed} birth record ka calf profile bana/link kiya gaya`)}catch(e){toast(e.message,false)}
 }
 async function deleteRecord(type,key){
- if(isModuleHidden(type)||isModuleViewOnly(type)){toast(`${state.role} role ke paas is action ki permission nahi hai`,false);return}
+ if(isModuleHidden(permModule(type))||isModuleViewOnly(permModule(type))){toast(`${state.role} role ke paas is action ki permission nahi hai`,false);return}
  if(!confirm("Delete this record?"))return;
  const path=recordPaths[type];
  try{await remove(path,key);toast("Deleted")}catch(e){toast(e.message,false)}
 }
 function milkRecordId(date,animalId){return `MILK-${date}-${animalId}`.replace(/[^A-Za-z0-9-]/g,"")}
+function insourceRecordId(date,sourceId){return `INSRC-${date}-${sourceId}`.replace(/[^A-Za-z0-9-]/g,"")}
 function milkPage(){
  if(!state.milkTab)state.milkTab="entry";
  if(!state.milkDate)state.milkDate=today();
  const rows=list("milkRecords");
- const todayTotal=rows.filter(x=>x.date===today()).reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
+ const insrcRows=list("milkInsourceRecords");
+ const cowTodayTotal=rows.filter(x=>x.date===today()).reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
+ const insrcTodayTotal=insrcRows.filter(x=>x.date===today()).reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
  const tabs=`<div class="flex gap-2 mb-5 flex-wrap">
-   <button onclick="state.milkTab='entry';renderPage()" class="btn ${state.milkTab==='entry'?"btn-primary":"btn-soft"}">📝 Daily Entry</button>
-   <button onclick="state.milkTab='history';renderPage()" class="btn ${state.milkTab==='history'?"btn-primary":"btn-soft"}">📜 History</button>
-   <button onclick="state.milkTab='monthly';renderPage()" class="btn ${state.milkTab==='monthly'?"btn-primary":"btn-soft"}">📅 Monthly Total</button>
+   <button onclick="state.milkTab='entry';renderPage()" class="btn ${state.milkTab==='entry'?"btn-primary":"btn-soft"}">📝 Cow Milk Entry</button>
+   <button onclick="state.milkTab='history';renderPage()" class="btn ${state.milkTab==='history'?"btn-primary":"btn-soft"}">📜 Cow History</button>
+   <button onclick="state.milkTab='monthly';renderPage()" class="btn ${state.milkTab==='monthly'?"btn-primary":"btn-soft"}">📅 Cow Monthly</button>
+   <button onclick="state.milkTab='insource';renderPage()" class="btn ${state.milkTab==='insource'?"btn-primary":"btn-soft"}">🚚 Insource Entry</button>
+   <button onclick="state.milkTab='insourceHistory';renderPage()" class="btn ${state.milkTab==='insourceHistory'?"btn-primary":"btn-soft"}">📜 Insource History</button>
+   <button onclick="state.milkTab='insourceMonthly';renderPage()" class="btn ${state.milkTab==='insourceMonthly'?"btn-primary":"btn-soft"}">📅 Insource Monthly</button>
+   <button onclick="state.milkTab='combined';renderPage()" class="btn ${state.milkTab==='combined'?"btn-primary":"btn-soft"}">🔗 Combined Total</button>
  </div>`;
- return pageHeader("Milk Production","Cow-wise daily doodh entry, puri history aur month-wise total ek jagah.","","Daily Entry tab me kisi bhi date ka morning-evening doodh har cow ke liye ek saath bhar sakte hain. History tab me kisi bhi purani date ka record dekh, edit ya delete kar sakte hain. Monthly Total tab me har mahine ka total milk production dikhta hai.")
- +`<div class="grid md:grid-cols-3 gap-3 mb-5">${stat("Today's milk",todayTotal.toFixed(1)+" L","🥛")}${stat("Milk records",rows.length,"📝")}${stat("Lactating",animals().filter(x=>x.status==="Lactating").length,"🐄")}</div>`
+ return pageHeader("Milk Production","Cow-wise daily doodh entry + bahar se insource kiya gaya doodh, sab ek jagah.","","Cow Milk tabs se apni cows ka doodh record karein. Insource tabs se bahar se (kisi vyakti/dairy/vendor se) khareeda/liya gaya doodh record karein — pehle 🚚 Insource Entry tab me '+ Add Source' se source (jaise doodhiye ya dairy ka naam) banayein, fir uske saamne roz ka morning/evening milk bharein. 🔗 Combined Total tab me cow + insource dono milakar total production month-wise dikhta hai.")
+ +`<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">${stat("Cow milk today",cowTodayTotal.toFixed(1)+" L","🥛")}${stat("Insource today",insrcTodayTotal.toFixed(1)+" L","🚚")}${stat("Combined today",(cowTodayTotal+insrcTodayTotal).toFixed(1)+" L","🔗")}${stat("Lactating cows",animals().filter(x=>x.status==="Lactating").length,"🐄")}</div>`
  +tabs
- +(state.milkTab==="history"?milkHistoryTab():state.milkTab==="monthly"?milkMonthlyTab():milkEntryTab());
-}
-// Groups every milkRecords entry by its YYYY-MM month so the owner can see, at a glance,
-// how much total milk the gaushala produced in each month.
-function milkMonthlyTab(){
- const map={};
- list("milkRecords").forEach(r=>{
-  const m=(r.date||"").slice(0,7);
-  if(!m)return;
-  if(!map[m])map[m]={month:m,morning:0,evening:0,days:new Set()};
-  map[m].morning+=Number(r.morning||0);
-  map[m].evening+=Number(r.evening||0);
-  map[m].days.add(r.date);
- });
- const months=Object.values(map).sort((a,b)=>b.month.localeCompare(a.month));
- return `<div class="card p-5">
-  ${!months.length?`<div class="py-14 text-center text-stone-500">Abhi tak koi milk record nahi hai.</div>`:`
-  <div class="overflow-auto"><table class="w-full text-sm">
-   <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Month</th><th class="p-3 text-left">Morning Total</th><th class="p-3 text-left">Evening Total</th><th class="p-3 text-left">Total Produced</th><th class="p-3 text-left">Days Recorded</th><th class="p-3 text-left">Avg / Day</th></tr></thead>
-   <tbody>${months.map(m=>{const total=m.morning+m.evening;const dayCount=m.days.size||1;return `<tr class="border-b"><td class="p-3 font-semibold">${esc(m.month)}</td><td class="p-3">${m.morning.toFixed(1)} L</td><td class="p-3">${m.evening.toFixed(1)} L</td><td class="p-3 font-bold">${total.toFixed(1)} L</td><td class="p-3">${dayCount}</td><td class="p-3">${(total/dayCount).toFixed(1)} L</td></tr>`}).join("")}</tbody>
-  </table></div>`}
- </div>`;
+ +(state.milkTab==="history"?milkHistoryTab():state.milkTab==="monthly"?milkMonthlyTab():state.milkTab==="insource"?insourceEntryTab():state.milkTab==="insourceHistory"?insourceHistoryTab():state.milkTab==="insourceMonthly"?monthlyTotalTab("milkInsourceRecords"):state.milkTab==="combined"?combinedMilkTab():milkEntryTab());
 }
 function milkEntryTab(){
  const viewOnly=isModuleViewOnly("Milk");
@@ -936,15 +998,15 @@ function milkEntryTab(){
    </div>
   </div>
   ${!cows.length?`<div class="py-14 text-center text-stone-500">Koi female animal registered nahi hai. Pehle Animals module me cow add karein.</div>`:`
-  <div class="overflow-auto"><table class="w-full text-sm" id="milkEntryTable">
+  <div class="rtable overflow-auto"><table class="w-full text-sm" id="milkEntryTable">
    <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Morning (L)</th><th class="p-3 text-left">Evening (L)</th><th class="p-3 text-left">Total</th></tr></thead>
-   <tbody>${rows.map(({a,rec})=>`<tr class="border-b" data-animal="${esc(a.id)}"><td class="p-3"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0 ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-10 h-10 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}${a.status?" · "+esc(a.status):""}</span></div></div></td>
-    <td class="p-3"><input ${viewOnly?"disabled":""} type="number" min="0" step="0.1" class="input !py-1.5 milk-morning" value="${rec&&rec.morning?rec.morning:""}" placeholder="0" oninput="updateMilkRowTotal(this)"></td>
-    <td class="p-3"><input ${viewOnly?"disabled":""} type="number" min="0" step="0.1" class="input !py-1.5 milk-evening" value="${rec&&rec.evening?rec.evening:""}" placeholder="0" oninput="updateMilkRowTotal(this)"></td>
-    <td class="p-3 row-total text-stone-600">${rec?((Number(rec.morning||0)+Number(rec.evening||0)).toFixed(1)+" L"):"—"}</td>
+   <tbody>${rows.map(({a,rec})=>`<tr class="border-b" data-animal="${esc(a.id)}"><td class="p-3 rt-main"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0 ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-10 h-10 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}${a.status?" · "+esc(a.status):""}</span></div></div></td>
+    <td class="p-3" data-label="Morning (L)"><input ${viewOnly?"disabled":""} inputmode="decimal" type="number" min="0" step="0.1" class="input !py-1.5 milk-morning" value="${rec&&rec.morning?rec.morning:""}" placeholder="0" oninput="updateMilkRowTotal(this)"></td>
+    <td class="p-3" data-label="Evening (L)"><input ${viewOnly?"disabled":""} inputmode="decimal" type="number" min="0" step="0.1" class="input !py-1.5 milk-evening" value="${rec&&rec.evening?rec.evening:""}" placeholder="0" oninput="updateMilkRowTotal(this)"></td>
+    <td class="p-3 row-total text-stone-600 font-semibold" data-label="Total">${rec?((Number(rec.morning||0)+Number(rec.evening||0)).toFixed(1)+" L"):"—"}</td>
    </tr>`).join("")}</tbody>
   </table></div>
-  ${viewOnly?"":`<button class="btn btn-primary mt-4" onclick="saveMilkEntries()">💾 Save All Entries</button>`}`}
+  ${viewOnly?"":`<button class="btn btn-primary mt-4 w-full md:w-auto" onclick="saveMilkEntries()">💾 Save All Entries</button>`}`}
  </div>`;
 }
 function updateMilkRowTotal(input){
@@ -968,6 +1030,117 @@ async function saveMilkEntries(){
  if(!ops.length){toast("Koi entry nahi bhari",false);return}
  try{await Promise.all(ops);toast(`${ops.length} cow(s) ka milk record saved`);renderPage()}catch(e){toast(e.message,false)}
 }
+// ---- Milk Insource: entry, history, and shared monthly summary ----
+function insourceEntryTab(){
+ const viewOnly=isModuleViewOnly("Milk");
+ const sources=milkSources().sort((a,b)=>(a.sourceName||a.name||"").localeCompare(b.sourceName||b.name||""));
+ const dateVal=state.milkDate;
+ const rows=sources.map(s=>({s,rec:list("milkInsourceRecords").find(r=>r.sourceId===s.id&&r.date===dateVal)}));
+ const totalMorning=rows.reduce((sum,r)=>sum+Number(r.rec?.morning||0),0), totalEvening=rows.reduce((sum,r)=>sum+Number(r.rec?.evening||0),0);
+ return `<div class="card p-5">
+  <div class="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+   <label class="text-sm font-semibold text-slate-600">Date<input type="date" class="input mt-1" value="${esc(dateVal)}" onchange="state.milkDate=this.value;renderPage()" max="${today()}"></label>
+   <div class="flex gap-2 md:ml-auto text-sm flex-wrap">
+    <div class="bg-green-50 rounded-lg px-3 py-2"><span class="text-xs text-green-700 block">Morning total</span><b>${totalMorning.toFixed(1)} L</b></div>
+    <div class="bg-amber-50 rounded-lg px-3 py-2"><span class="text-xs text-amber-700 block">Evening total</span><b>${totalEvening.toFixed(1)} L</b></div>
+    <div class="bg-stone-100 rounded-lg px-3 py-2"><span class="text-xs text-stone-600 block">Day total</span><b>${(totalMorning+totalEvening).toFixed(1)} L</b></div>
+   </div>
+   ${viewOnly?"":`<button class="btn btn-soft" onclick="openRecord('MilkSources')">＋ Add Source</button>`}
+  </div>
+  ${!sources.length?`<div class="py-14 text-center text-stone-500">Abhi koi milk source add nahi hui. Upar '+ Add Source' se pehli source add karein (jaise kisi doodhiye ya dairy ka naam) jaha se aap doodh insource karte hain.</div>`:`
+  <div class="rtable overflow-auto"><table class="w-full text-sm" id="insourceEntryTable">
+   <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Source</th><th class="p-3 text-left">Morning (L)</th><th class="p-3 text-left">Evening (L)</th><th class="p-3 text-left">Total</th><th></th></tr></thead>
+   <tbody>${rows.map(({s,rec})=>`<tr class="border-b" data-source="${esc(s.id)}"><td class="p-3 rt-main"><b>${esc(s.sourceName||s.name||"Unnamed")}</b>${s.contact?`<span class="block text-xs text-stone-500">${esc(s.contact)}</span>`:""}</td>
+    <td class="p-3" data-label="Morning (L)"><input ${viewOnly?"disabled":""} inputmode="decimal" type="number" min="0" step="0.1" class="input !py-1.5 insrc-morning" value="${rec&&rec.morning?rec.morning:""}" placeholder="0" oninput="updateInsourceRowTotal(this)"></td>
+    <td class="p-3" data-label="Evening (L)"><input ${viewOnly?"disabled":""} inputmode="decimal" type="number" min="0" step="0.1" class="input !py-1.5 insrc-evening" value="${rec&&rec.evening?rec.evening:""}" placeholder="0" oninput="updateInsourceRowTotal(this)"></td>
+    <td class="p-3 row-total text-stone-600 font-semibold" data-label="Total">${rec?((Number(rec.morning||0)+Number(rec.evening||0)).toFixed(1)+" L"):"—"}</td>
+    <td class="p-3 text-right rt-actions">${viewOnly?"":`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('MilkSources','${esc(s.id)}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('MilkSources','${esc(s.id)}')">Delete</button></div>`}</td>
+   </tr>`).join("")}</tbody>
+  </table></div>
+  ${viewOnly?"":`<button class="btn btn-primary mt-4 w-full md:w-auto" onclick="saveInsourceEntries()">💾 Save All Entries</button>`}`}
+ </div>`;
+}
+function updateInsourceRowTotal(input){
+ const tr=input.closest("tr");
+ const m=Number(tr.querySelector(".insrc-morning").value||0), e=Number(tr.querySelector(".insrc-evening").value||0);
+ tr.querySelector(".row-total").textContent=(m+e>0)?(m+e).toFixed(1)+" L":"—";
+}
+async function saveInsourceEntries(){
+ if(isModuleViewOnly("Milk")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
+ const table=document.getElementById("insourceEntryTable");if(!table)return;
+ const date=state.milkDate;
+ let ops=[];
+ table.querySelectorAll("tbody tr").forEach(tr=>{
+  const sourceId=tr.dataset.source;
+  const morning=tr.querySelector(".insrc-morning").value;
+  const evening=tr.querySelector(".insrc-evening").value;
+  if(morning!==""||evening!==""){
+   ops.push(save("milkInsourceRecords",insourceRecordId(date,sourceId),{sourceId,date,morning:Number(morning||0),evening:Number(evening||0)}));
+  }
+ });
+ if(!ops.length){toast("Koi entry nahi bhari",false);return}
+ try{await Promise.all(ops);toast(`${ops.length} source(s) ka insource milk record saved`);renderPage()}catch(e){toast(e.message,false)}
+}
+function insourceHistoryTab(){
+ const viewOnly=isModuleViewOnly("Milk");
+ let rows=list("milkInsourceRecords").sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(a.sourceId||"").localeCompare(b.sourceId||""));
+ if(state.search){const q=state.search.toLowerCase();rows=rows.filter(x=>{const s=findMilkSource(x.sourceId);return `${x.sourceId} ${x.date} ${s?(s.sourceName||s.name||""):""}`.toLowerCase().includes(q)})}
+ return `<div class="card p-5">
+  <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+   <span class="text-sm text-stone-600">${rows.length} records</span>
+   <input class="input !w-64 max-w-full flex-1 sm:flex-none" placeholder="Source naam ya date (YYYY-MM-DD) se search karein" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()">
+  </div>
+  ${!rows.length?`<div class="py-14 text-center text-stone-500">Abhi tak koi insource milk record nahi hai.</div>`:`
+  <div class="rtable overflow-auto"><table class="w-full text-sm">
+   <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Date</th><th class="p-3 text-left">Source</th><th class="p-3 text-left">Morning</th><th class="p-3 text-left">Evening</th><th class="p-3 text-left">Total</th><th></th></tr></thead>
+   <tbody>${rows.map(x=>{const s=findMilkSource(x.sourceId);return `<tr class="border-b"><td class="p-3 rt-main">${fmt(x.date)}</td><td class="p-3" data-label="Source"><b>${esc(s?(s.sourceName||s.name||"Unnamed"):x.sourceId)}</b></td><td class="p-3" data-label="Morning">${Number(x.morning||0).toFixed(1)} L</td><td class="p-3" data-label="Evening">${Number(x.evening||0).toFixed(1)} L</td><td class="p-3 font-semibold" data-label="Total">${(Number(x.morning||0)+Number(x.evening||0)).toFixed(1)} L</td><td class="p-3 text-right rt-actions">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<button class="btn btn-danger !p-2" onclick="deleteInsourceRecord('${esc(x.id)}')">Delete</button>`}</td></tr>`}).join("")}</tbody>
+  </table></div>`}
+ </div>`;
+}
+async function deleteInsourceRecord(recId){
+ if(isModuleViewOnly("Milk")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
+ if(!confirm("Delete this insource milk record?"))return;
+ try{await remove("milkInsourceRecords",recId);toast("Deleted");renderPage()}catch(e){toast(e.message,false)}
+}
+// Shared month-wise summary builder — used for both cow milk (milkRecords) and
+// insource milk (milkInsourceRecords), so the two tabs stay identical in shape.
+function monthlyTotalTab(path){
+ const map={};
+ list(path).forEach(r=>{
+  const m=(r.date||"").slice(0,7);
+  if(!m)return;
+  if(!map[m])map[m]={month:m,morning:0,evening:0,days:new Set()};
+  map[m].morning+=Number(r.morning||0);
+  map[m].evening+=Number(r.evening||0);
+  map[m].days.add(r.date);
+ });
+ const months=Object.values(map).sort((a,b)=>b.month.localeCompare(a.month));
+ return `<div class="card p-5">
+  ${!months.length?`<div class="py-14 text-center text-stone-500">Abhi tak koi record nahi hai.</div>`:`
+  <div class="rtable overflow-auto"><table class="w-full text-sm">
+   <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Month</th><th class="p-3 text-left">Morning Total</th><th class="p-3 text-left">Evening Total</th><th class="p-3 text-left">Total Produced</th><th class="p-3 text-left">Days Recorded</th><th class="p-3 text-left">Avg / Day</th></tr></thead>
+   <tbody>${months.map(m=>{const total=m.morning+m.evening;const dayCount=m.days.size||1;return `<tr class="border-b"><td class="p-3 font-semibold rt-main">${esc(m.month)}</td><td class="p-3" data-label="Morning Total">${m.morning.toFixed(1)} L</td><td class="p-3" data-label="Evening Total">${m.evening.toFixed(1)} L</td><td class="p-3 font-bold" data-label="Total Produced">${total.toFixed(1)} L</td><td class="p-3" data-label="Days Recorded">${dayCount}</td><td class="p-3" data-label="Avg / Day">${(total/dayCount).toFixed(1)} L</td></tr>`}).join("")}</tbody>
+  </table></div>`}
+ </div>`;
+}
+function milkMonthlyTab(){return monthlyTotalTab("milkRecords")}
+// Combined "own cow milk + insourced milk" board — the separate board requested for
+// seeing total production regardless of where the milk actually came from.
+function combinedMilkTab(){
+ const cowMap={}, insMap={};
+ list("milkRecords").forEach(r=>{const m=(r.date||"").slice(0,7);if(!m)return;cowMap[m]=(cowMap[m]||0)+Number(r.morning||0)+Number(r.evening||0)});
+ list("milkInsourceRecords").forEach(r=>{const m=(r.date||"").slice(0,7);if(!m)return;insMap[m]=(insMap[m]||0)+Number(r.morning||0)+Number(r.evening||0)});
+ const months=Array.from(new Set([...Object.keys(cowMap),...Object.keys(insMap)])).sort((a,b)=>b.localeCompare(a));
+ const grandCow=Object.values(cowMap).reduce((s,v)=>s+v,0), grandIns=Object.values(insMap).reduce((s,v)=>s+v,0);
+ return `<div class="card p-5">
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">${stat("Total cow milk (all time)",grandCow.toFixed(1)+" L","🐄")}${stat("Total insource (all time)",grandIns.toFixed(1)+" L","🚚")}${stat("Grand total produced",(grandCow+grandIns).toFixed(1)+" L","🔗")}</div>
+  ${!months.length?`<div class="py-14 text-center text-stone-500">Abhi tak koi milk record (cow ya insource) nahi hai.</div>`:`
+  <div class="rtable overflow-auto"><table class="w-full text-sm">
+   <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Month</th><th class="p-3 text-left">Cow Milk</th><th class="p-3 text-left">Insource Milk</th><th class="p-3 text-left">Combined Total</th></tr></thead>
+   <tbody>${months.map(m=>{const cow=cowMap[m]||0,ins=insMap[m]||0;return `<tr class="border-b"><td class="p-3 font-semibold rt-main">${esc(m)}</td><td class="p-3" data-label="Cow Milk">${cow.toFixed(1)} L</td><td class="p-3" data-label="Insource Milk">${ins.toFixed(1)} L</td><td class="p-3 font-bold" data-label="Combined Total">${(cow+ins).toFixed(1)} L</td></tr>`}).join("")}</tbody>
+  </table></div>`}
+ </div>`;
+}
 function milkHistoryTab(){
  const viewOnly=isModuleViewOnly("Milk");
  let rows=list("milkRecords").sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(a.animalId||"").localeCompare(b.animalId||""));
@@ -975,12 +1148,12 @@ function milkHistoryTab(){
  return `<div class="card p-5">
   <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
    <span class="text-sm text-stone-600">${rows.length} records</span>
-   <input class="input !w-64" placeholder="Cow ID, naam ya date (YYYY-MM-DD) se search karein" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()">
+   <input class="input !w-64 max-w-full flex-1 sm:flex-none" placeholder="Cow ID, naam ya date (YYYY-MM-DD) se search karein" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()">
   </div>
   ${!rows.length?`<div class="py-14 text-center text-stone-500">Abhi tak koi milk record nahi hai.</div>`:`
-  <div class="overflow-auto"><table class="w-full text-sm">
+  <div class="rtable overflow-auto"><table class="w-full text-sm">
    <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Date</th><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Morning</th><th class="p-3 text-left">Evening</th><th class="p-3 text-left">Total</th><th></th></tr></thead>
-   <tbody>${rows.map(x=>{const a=findAnimal(x.animalId);return `<tr class="border-b"><td class="p-3">${fmt(x.date)}</td><td class="p-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0 ${a&&a.photo?"cursor-pointer":""}" ${a&&a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a&&a.photo?`<img class="w-8 h-8 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(x.animalId)}</b><span class="block text-xs text-stone-500">${esc(a?.name||"")}</span></div></div></td><td class="p-3">${Number(x.morning||0).toFixed(1)} L</td><td class="p-3">${Number(x.evening||0).toFixed(1)} L</td><td class="p-3 font-semibold">${(Number(x.morning||0)+Number(x.evening||0)).toFixed(1)} L</td><td class="p-3 text-right">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('Milk','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Milk','${x.id}')">Delete</button></div>`}</td></tr>`}).join("")}</tbody>
+   <tbody>${rows.map(x=>{const a=findAnimal(x.animalId);return `<tr class="border-b"><td class="p-3 rt-main">${fmt(x.date)}</td><td class="p-3" data-label="Cow"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0 ${a&&a.photo?"cursor-pointer":""}" ${a&&a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a&&a.photo?`<img class="w-8 h-8 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(x.animalId)}</b><span class="block text-xs text-stone-500">${esc(a?.name||"")}</span></div></div></td><td class="p-3" data-label="Morning">${Number(x.morning||0).toFixed(1)} L</td><td class="p-3" data-label="Evening">${Number(x.evening||0).toFixed(1)} L</td><td class="p-3 font-semibold" data-label="Total">${(Number(x.morning||0)+Number(x.evening||0)).toFixed(1)} L</td><td class="p-3 text-right rt-actions">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openRecord('Milk','${x.id}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Milk','${x.id}')">Delete</button></div>`}</td></tr>`}).join("")}</tbody>
   </table></div>`}
  </div>`;
 }
@@ -1024,19 +1197,19 @@ function feedPage(){
   const min=Number(it.minimumStock||0);
   const low=min>0&&stock<=min;
   return `<tr class="border-b">
-   <td class="p-3"><b>${esc(it.name)}</b></td>
-   <td class="p-3">${esc(it.unit||"—")}</td>
-   <td class="p-3 font-semibold ${low?"text-red-700":""}">${stock.toFixed(1)} ${esc(it.unit||"")}</td>
-   <td class="p-3">${min?min.toFixed(1)+" "+esc(it.unit||""):"—"}</td>
-   <td class="p-3">${avg?avg.toFixed(2)+" / day":"—"}</td>
-   <td class="p-3">${days===null?"—":days<=0?"Aaj/kal khatm ho sakta hai":days+" din · "+fmt(runOut)}</td>
-   <td class="p-3">${low?`<span class="badge bg-red-100 text-red-800" title="Stock minimum se kam ya barabar hai">Low Stock</span>`:`<span class="badge bg-[#e2edd8] text-[#2e4a1f]">OK</span>`}</td>
-   <td class="p-3 text-right"><div class="flex gap-2 justify-end flex-wrap">
+   <td class="p-3 rt-main"><b>${esc(it.name)}</b></td>
+   <td class="p-3" data-label="Unit">${esc(it.unit||"—")}</td>
+   <td class="p-3 font-semibold ${low?"text-red-700":""}" data-label="Current Stock">${stock.toFixed(1)} ${esc(it.unit||"")}</td>
+   <td class="p-3" data-label="Minimum">${min?min.toFixed(1)+" "+esc(it.unit||""):"—"}</td>
+   <td class="p-3" data-label="Avg Daily Use">${avg?avg.toFixed(2)+" / day":"—"}</td>
+   <td class="p-3" data-label="Khatam Hoga">${days===null?"—":days<=0?"Aaj/kal khatm ho sakta hai":days+" din · "+fmt(runOut)}</td>
+   <td class="p-3" data-label="Status">${low?`<span class="badge bg-red-100 text-red-800" title="Stock minimum se kam ya barabar hai">Low Stock</span>`:`<span class="badge bg-[#e2edd8] text-[#2e4a1f]">OK</span>`}</td>
+   <td class="p-3 text-right rt-actions"><div class="flex gap-2 justify-end flex-wrap">
     ${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<button class="btn btn-soft !p-2" onclick="openFeedPurchase('${esc(it.id)}')">📥 Purchase</button><button class="btn btn-soft !p-2" onclick="openFeedUsage('${esc(it.id)}')">📤 Daily Use</button><button class="btn btn-soft !p-2" onclick="openRecord('Feed','${esc(it.id)}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Feed','${esc(it.id)}')">Delete</button>`}
    </div></td>
   </tr>`;
  }).join("");
- const table=`<div class="card p-5 overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-stone-500">
+ const table=`<div class="card p-5 rtable overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-stone-500">
   <th class="p-3 text-left">Item</th><th class="p-3 text-left">Unit</th><th class="p-3 text-left" title="${esc(FIELD_MEANINGS.quantity)}">Current Stock</th><th class="p-3 text-left" title="${esc(FIELD_MEANINGS.minimumStock)}">Minimum</th><th class="p-3 text-left">Avg Daily Use</th><th class="p-3 text-left">Khatam Hoga</th><th class="p-3 text-left">Status</th><th></th>
  </tr></thead><tbody>${rowsHTML}</tbody></table></div>`;
  return header+table;
@@ -1085,7 +1258,7 @@ window.openFeedPurchase=openFeedPurchase;window.submitFeedPurchase=submitFeedPur
 function reportsPage(){
  const a=animals().filter(x=>x.status!=="Deceased"), exp=list("expenses").reduce((s,x)=>s+Number(x.amount||0),0), milk=list("milkRecords").reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
  return pageHeader("Reports","Quick operational summary. Har report ab PDF me download ho sakti hai.",`<button class="btn btn-soft" onclick="exportAnimals()">↓ Export Animals PDF</button>`,"Yahan se animal, milk, expenses jaisi saari reports dekh sakte hain. Har button apni report ka PDF banake download kar dega.")
- +`<div class="grid md:grid-cols-3 gap-4 mb-5">${stat("Animals",a.length,"🐄")}${stat("Total milk records",milk.toFixed(1)+" L","🥛")}${stat("Expenses recorded","₹"+exp.toLocaleString("en-IN"),"₹")}</div>
+ +`<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-5">${stat("Animals",a.length,"🐄")}${stat("Total milk records",milk.toFixed(1)+" L","🥛")}${stat("Expenses recorded","₹"+exp.toLocaleString("en-IN"),"₹")}</div>
  <div class="card p-5"><h3 class="font-bold">Monthly / operational reports</h3><p class="text-xs text-stone-500 mt-1">Kisi bhi report par tap karke uska PDF turant download kar sakte hain.</p><div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">${Object.keys(REPORT_CONFIGS).map(x=>`<button class="btn btn-soft justify-start" onclick="downloadReportPDF('${x}')">📄 ${x}</button>`).join("")}</div></div>`
 }
 function expensesPage(){
@@ -1101,7 +1274,7 @@ function expensesPage(){
  const header=pageHeader("Expenses & Income","Feed, medicines, labour, utilities, donations aur baaki har kharcha yahan darj karein.",
    viewOnly?"":`<button class="btn btn-primary" onclick="openRecord('Expenses')">＋ Add Expense</button>`,
    "Har kharcha yahan darj karein — category, amount, vendor. Neeche month select karke us mahine ka total kharcha dekh sakte hain, aur upar total (all-time) kharcha bhi dikhta hai.");
- const summary=`<div class="grid md:grid-cols-3 gap-3 mb-5">
+ const summary=`<div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
   ${stat("Total Expenses (all time)","₹"+totalAll.toLocaleString("en-IN"),"₹")}
   <div class="stat-card p-4">
    <label class="text-xs font-bold uppercase tracking-wide block mb-1" style="color:var(--ink-soft)">View month total${infoIcon("Kisi bhi mahine ko select karke uska total kharcha dekhein.")}</label>
@@ -1111,7 +1284,7 @@ function expensesPage(){
   </div>
   <div class="stat-card p-4"><div class="flex justify-between items-start text-xs font-bold uppercase tracking-wide" style="color:var(--ink-soft)"><span>Selected month total</span></div><b class="font-display block text-[1.65rem] leading-tight mt-2.5" style="color:var(--ink)">₹${monthTotal.toLocaleString("en-IN")}</b></div>
  </div>`;
- return header+summary+`<div class="card p-5"><div class="flex items-center justify-between mb-4"><span class="text-sm text-stone-600">${rows.length} records</span><input class="input !w-64" placeholder="Filter records" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div>${genericTable("Expenses",rows)}</div>`;
+ return header+summary+`<div class="card p-5"><div class="flex items-center justify-between mb-4 gap-3 flex-wrap"><span class="text-sm text-stone-600">${rows.length} records</span><input class="input !w-64 max-w-full flex-1 sm:flex-none" placeholder="Filter records" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div>${genericTable("Expenses",rows)}</div>`;
 }
 function storageStats(){
  const fbBytes=new Blob([JSON.stringify(state.data||{})]).size;
@@ -1160,7 +1333,7 @@ function bloodlinePage(){
  }
  let rootNode=buildFamilyTree(rootId);
  if(danglingMotherId)rootNode={id:danglingMotherId,missing:true,children:[rootNode]};
- return header+selector+`<div class="card p-5 overflow-auto scrollbar"><div class="famtree"><ul><li>${renderFamNode(rootNode,selected)}</li></ul></div></div>`;
+ return header+selector+`<div class="card p-5"><p class="sm:hidden text-xs text-center mb-3" style="color:var(--ink-soft)">👉 Poora tree dekhne ke liye sideways scroll karein</p><div class="overflow-auto scrollbar"><div class="famtree"><ul><li>${renderFamNode(rootNode,selected)}</li></ul></div></div></div>`;
 }
 // Hides <option>s in the Blood Line select that don't match the typed search text —
 // gives a "search" feel on top of the plain dropdown, without needing a heavier widget.
@@ -1302,6 +1475,14 @@ const REPORT_CONFIGS={
   });
   return Object.values(map).sort((a,b)=>b.month.localeCompare(a.month)).map(m=>({month:m.month,totalMorning:m.totalMorning.toFixed(1),totalEvening:m.totalEvening.toFixed(1),total:(m.totalMorning+m.totalEvening).toFixed(1),entries:m.entries}));
  },columns:[["Month","month"],["Morning Total (L)","totalMorning"],["Evening Total (L)","totalEvening"],["Total (L)","total"],["Entries","entries"]]},
+ "Milk Insource":{rows:()=>list("milkInsourceRecords").sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(r=>({...r,sourceLabel:(findMilkSource(r.sourceId)||{}).sourceName||(findMilkSource(r.sourceId)||{}).name||r.sourceId,total:(Number(r.morning||0)+Number(r.evening||0)).toFixed(1)})),columns:[["Date","date"],["Source","sourceLabel"],["Morning (L)","morning"],["Evening (L)","evening"],["Total (L)","total"]]},
+ "Combined Milk Production":{rows:()=>{
+  const cowMap={},insMap={};
+  list("milkRecords").forEach(r=>{const m=(r.date||"").slice(0,7);if(!m)return;cowMap[m]=(cowMap[m]||0)+Number(r.morning||0)+Number(r.evening||0)});
+  list("milkInsourceRecords").forEach(r=>{const m=(r.date||"").slice(0,7);if(!m)return;insMap[m]=(insMap[m]||0)+Number(r.morning||0)+Number(r.evening||0)});
+  const months=Array.from(new Set([...Object.keys(cowMap),...Object.keys(insMap)])).sort((a,b)=>b.localeCompare(a));
+  return months.map(m=>({month:m,cow:(cowMap[m]||0).toFixed(1),insource:(insMap[m]||0).toFixed(1),combined:((cowMap[m]||0)+(insMap[m]||0)).toFixed(1)}));
+ },columns:[["Month","month"],["Cow Milk (L)","cow"],["Insource Milk (L)","insource"],["Combined Total (L)","combined"]]},
  "Feed Stock Summary":{rows:()=>list("feedInventory").map(it=>{const stock=feedStock(it.id),min=Number(it.minimumStock||0);return {name:it.name,unit:it.unit,stock:stock.toFixed(1),minimumStock:it.minimumStock||"—",avgDailyUsage:feedAvgDailyUsage(it.id).toFixed(2),status:(min&&stock<=min)?"Low Stock":"OK"}}),columns:[["Feed Item","name"],["Unit","unit"],["Current Stock","stock"],["Minimum Stock","minimumStock"],["Avg Daily Usage","avgDailyUsage"],["Status","status"]]},
  "Feed Purchases":{rows:()=>list("feedPurchases").sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(r=>({...r,itemName:(list("feedInventory").find(x=>x.id===r.feedItemId)||{}).name||r.feedItemId})),columns:[["Date","date"],["Feed Item","itemName"],["Quantity","quantity"],["Total Cost","totalCost"],["Rate/Unit","ratePerUnit"],["Notes","notes"]]},
  "Feed Daily Usage":{rows:()=>list("feedUsage").sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(r=>({...r,itemName:(list("feedInventory").find(x=>x.id===r.feedItemId)||{}).name||r.feedItemId})),columns:[["Date","date"],["Feed Item","itemName"],["Quantity Used","quantity"]]},
@@ -1337,6 +1518,7 @@ function downloadReportPDF(key){
 function exportAnimals(){downloadReportPDF("Animal Master")}
 window.go=go;window.toggleSide=toggleSide;window.openAnimal=openAnimal;window.deleteAnimal=deleteAnimal;window.openPregnancy=openPregnancy;window.closeModal=closeModal;window.submitAnimal=submitAnimal;window.submitPregnancy=submitPregnancy;window.openRecord=openRecord;window.submitRecord=submitRecord;window.deleteRecord=deleteRecord;window.triggerPhotoInput=triggerPhotoInput;window.handlePhotoSelected=handlePhotoSelected;window.saveCloudSettings=saveCloudSettings;window.exportAnimals=exportAnimals;window.state=state;window.renderPage=renderPage;window.attemptLogin=attemptLogin;window.logout=logout;window.saveMilkEntries=saveMilkEntries;window.updateMilkRowTotal=updateMilkRowTotal;window.repairCalfLinks=repairCalfLinks;
 window.downloadAnimalQR=downloadAnimalQR;window.printAnimalTag=printAnimalTag;window.printAllTags=printAllTags;window.renderQRInto=renderQRInto;window.animalPublicUrl=animalPublicUrl;
+window.saveInsourceEntries=saveInsourceEntries;window.updateInsourceRowTotal=updateInsourceRowTotal;window.deleteInsourceRecord=deleteInsourceRecord;
 
 // ---- Boot ----
 // Only the paths a public bio-data profile actually needs (keeps the anonymous-scan
