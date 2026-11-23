@@ -182,7 +182,7 @@ const modules={
   Vaccination:["💉","Vaccination"], Deworming:["🛡️","Deworming"], "Tick Control":["🪲","Tick Control"], "Nail Cutting":["✂️","Nail Cutting"],
   Sheds:["🏠","Sheds"], Workers:["👷","Workers"], Tasks:["☑️","Tasks"], Expenses:["₹","Expenses"], Reports:["📊","Reports"], Settings:["⚙️","Settings"]
 };
-const APP_VERSION="v2.4";
+const APP_VERSION="v2.6";
 const OWNER_PASSWORD="admin123";
 // Only 2 logins now: Owner (password protected, full access) and Management Team
 // (no password, sirf Milk module dikhta/chalta hai — kuch aur nahi).
@@ -264,7 +264,7 @@ function infoIcon(text){
 document.addEventListener("click",e=>{
  document.querySelectorAll("details.info[open]").forEach(d=>{if(!d.contains(e.target))d.removeAttribute("open")});
 });
-const paths=["animals","pregnancies","calvings","milkRecords","milkSources","milkInsourceRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","feedRecords","feedPurchases","feedUsage","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog"];
+const paths=["animals","pregnancies","calvings","milkRecords","milkSources","milkInsourceRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog"];
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function id(prefix){return prefix+"-"+Math.random().toString(36).slice(2,7).toUpperCase()}
@@ -308,6 +308,8 @@ function animals(){return list("animals")}
 function findAnimal(id){return animals().find(a=>a.id===id)}
 function milkSources(){return list("milkSources")}
 function findMilkSource(id){return milkSources().find(s=>s.id===id)}
+// Purane animals jinme milkingStatus field nahi hai wo Milking maane jayenge
+function isMilking(a){return (a.milkingStatus||"Milking")!=="Not Milking"}
 
 // ============ QR CODE / EAR TAG SYSTEM ============
 // The QR encodes a link back to this same page with ?tag=<animalId>. Scanning it (any
@@ -430,6 +432,7 @@ function publicProfileHTML(bio){
    <div class="bio-stat"><span>Joined Gaushala</span><b>${fmt(a.joinedDate)}</b></div>
    <div class="bio-stat"><span>Avg Milk (30 days)</span><b>${avgMilk?avgMilk.toFixed(1)+" L/day":"—"}</b></div>
    <div class="bio-stat"><span>Last Milk Entry</span><b>${milk.length?fmt(milk[0].date):"—"}</b></div>
+   <div class="bio-stat"><span>Milking Status</span><b>${esc(a.milkingStatus||"Milking")}</b></div>
   </div>
   ${a.status==="Deceased"?`<div class="card p-5 bg-stone-50"><h3 class="font-display font-semibold text-base mb-2">🕊️ Death Record</h3><p class="text-sm"><b>Date:</b> ${fmt(a.deathDate)}</p><p class="text-sm mt-1"><b>Reason:</b> ${esc(a.deathReason||"—")}</p></div>`:""}
   ${a.notes?`<div class="card p-5"><h3 class="font-display font-semibold text-base mb-2">📝 Notes</h3><p class="text-sm text-stone-600">${esc(a.notes)}</p></div>`:""}
@@ -476,6 +479,7 @@ const FIELD_MEANINGS={
  joinedDate:"Yeh animal gaushala mein kab aaya/join hua.",
  shed:"Animal abhi kaunse shed/jagah par rakha hai.",
  status:"Animal ki current health ya production condition.",
+ milkingStatus:"Milking = cow abhi doodh de rahi hai, Milk entry tab me dikhegi. Not Milking = Milk entry tab me nahi dikhegi (purana milk record safe rehta hai).",
  motherId:"Is animal ki maa ka Animal ID — Blood Line tree isi se banta hai.",
  fatherId:"Is animal ke baap ka Animal ID (optional).",
  deathDate:"Animal ki death ki tareekh.",
@@ -503,7 +507,9 @@ const FIELD_MEANINGS={
  minimumStock:"Jab current stock isse kam ho jaaye to alert mil jayega.",
  openingStock:"Jab yeh item pehli baar record kiya tab kitna stock tha (optional).",
  costPerUnit:"Ek unit (jaise 1 kg) ki approx cost — sirf reference ke liye, asli cost purchase entry se aati hai.",
- quantity:"Kitni matra — item ki unit mein (purchase ya daily use).",
+ quantity:"Kitna feed/stock khareeda gaya (kg, bag jo bhi aap use karte hain).",
+ purchaseDate:"Feed kis din khareeda gaya.",
+ dailyUse:"Roz kitna feed lagta hai — isi se pata chalta hai stock kitne din chalega.",
  totalCost:"Is purchase par total kitna paisa kharch hua (₹).",
  capacity:"Is shed mein zyada se zyada kitne animals reh sakte hain.",
  responsibleWorker:"Is shed ke liye zimmedar worker ka naam.",
@@ -669,13 +675,8 @@ function buildAlerts(){
   });
  });
  list("feedInventory").forEach(it=>{
-  const min=Number(it.minimumStock||0);
-  if(!min)return;
-  const stock=feedStock(it.id);
-  if(stock<=min){
-   const days=feedDaysRemaining(it.id);
-   alerts.push({type:"Feed Stock",icon:"🌾",animalId:it.name||it.id,animalName:"",due:days!==null?feedRunOutDate(it.id):today(),days:days!==null?days:0,extra:`Stock: ${stock.toFixed(1)} ${it.unit||""} (Minimum: ${min})`});
-  }
+  const f=feedCalc(it);
+  if(f&&f.left<=7)alerts.push({type:"Feed khatam hone wala hai",icon:"🌾",animalId:it.name||it.id,animalName:"",due:f.finish,days:f.left,extra:""});
  });
  alerts.sort((x,y)=>x.days-y.days);
  return alerts;
@@ -715,11 +716,19 @@ function dashboard(){
 function animalTable(arr){
  if(!arr.length)return `<div class="py-12 text-center text-stone-500">No animals found.</div>`;
  const viewOnly=isModuleViewOnly("Animals");
- return `<div class="rtable overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-stone-500 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3 rt-main"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3" data-label="Gender">${esc(a.gender)}</td><td class="p-3" data-label="Type">${esc(a.type)}</td><td class="p-3" data-label="Breed">${esc(a.breed||"—")}</td><td class="p-3" data-label="Status">${badge(a.status)}</td><td class="p-3" data-label="Shed">${esc(a.shed||"—")}</td><td class="p-3 text-right rt-actions"><div class="flex gap-2 justify-end flex-wrap"><button class="btn btn-soft !p-2" title="Print QR ear-tag" onclick="printAnimalTag('${esc(a.id)}')">🔖 QR</button>${viewOnly?"":`<button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button><button class="btn btn-danger !p-2" onclick="deleteAnimal('${esc(a.id)}')">Delete</button>`}</div></td></tr>`).join("")}</tbody></table></div>`
+ return `<div class="rtable overflow-auto scrollbar"><table class="w-full text-sm"><thead><tr class="text-xs uppercase text-stone-500 border-b"><th class="text-left p-3">Animal</th><th class="text-left p-3">Gender</th><th class="text-left p-3">Type</th><th class="text-left p-3">Breed</th><th class="text-left p-3">Status</th><th class="text-left p-3">Shed</th><th></th></tr></thead><tbody>${arr.map(a=>`<tr class="border-b last:border-0"><td class="p-3 rt-main"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg bg-green-50 grid place-items-center overflow-hidden ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-9 h-9 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}</span></div></div></td><td class="p-3" data-label="Gender">${esc(a.gender)}</td><td class="p-3" data-label="Type">${esc(a.type)}</td><td class="p-3" data-label="Breed">${esc(a.breed||"—")}</td><td class="p-3" data-label="Status">${badge(a.status)}</td><td class="p-3" data-label="Shed">${esc(a.shed||"—")}</td><td class="p-3 text-right rt-actions"><div class="flex gap-2 justify-end flex-wrap"><button class="btn btn-soft !p-2" title="Print QR ear-tag" onclick="printAnimalTag('${esc(a.id)}')">🔖 QR</button>${viewOnly||a.gender!=="Female"||a.status==="Deceased"?"":`<button class="btn btn-soft !p-2" title="Milk tab me dikhana ya hatana" onclick="toggleMilking('${esc(a.id)}')">${isMilking(a)?"🥛 Milking":"⏸ Not Milking"}</button>`}${viewOnly?"":`<button class="btn btn-soft !p-2" onclick="openAnimal('${esc(a.id)}')">Open</button><button class="btn btn-danger !p-2" onclick="deleteAnimal('${esc(a.id)}')">Delete</button>`}</div></td></tr>`).join("")}</tbody></table></div>`
 }
 // Every path where a record can reference an animal via its "animalId" field.
 // When an animal is deleted, all of its records across these modules are deleted too.
 const ANIMAL_LINKED_PATHS=["pregnancies","healthChecks","vaccinations","deworming","tickControl","nailCutting","milkRecords","births"];
+// One-tap Milking <-> Not Milking switch (Animals table se, edit khole bina)
+async function toggleMilking(animalId){
+ if(isModuleViewOnly("Animals")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
+ const a=findAnimal(animalId);if(!a)return;
+ const next=isMilking(a)?"Not Milking":"Milking";
+ try{await db.ref("animals/"+animalId).update({milkingStatus:next,updatedAt:new Date().toISOString()});toast(`${animalId} ab ${next} hai`)}catch(e){toast(e.message,false)}
+}
+window.toggleMilking=toggleMilking;
 async function deleteAnimal(animalId){
  if(isModuleViewOnly("Animals")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
  const a=findAnimal(animalId);
@@ -754,7 +763,7 @@ function animalsPage(){
 }
 function openAnimal(animalId=""){
  if(isModuleViewOnly("Animals")){toast(`${state.role} role sirf Animals dekh sakta hai, edit nahi`,false);return}
- const a=findAnimal(animalId)||{id:"",name:"",gender:"Female",type:"Cow",breed:"",dob:"",shed:"",status:"Healthy",earTag:"",joinedDate:today(),notes:"",motherId:"",fatherId:"",deathDate:"",deathReason:""};
+ const a=findAnimal(animalId)||{id:"",name:"",gender:"Female",type:"Cow",breed:"",dob:"",shed:"",status:"Healthy",milkingStatus:"Milking",earTag:"",joinedDate:today(),notes:"",motherId:"",fatherId:"",deathDate:"",deathReason:""};
  window.currentPhoto=a.photo||"";
  let upload=`<input type="file" id="photoInput" accept="image/*" class="hidden" onchange="handlePhotoSelected(event)">
   <div class="flex flex-wrap gap-2">
@@ -772,6 +781,7 @@ function openAnimal(animalId=""){
   field("Ear Tag","earTag",a.earTag)+field("Joined Gaushala","joinedDate",a.joinedDate,"date")+
   field("Shed / Location","shed",a.shed)+
   select("Status","status",["Healthy","Lactating","Pregnant","Dry","Sick","Under Treatment","Quarantine","Emergency","Deceased"],a.status,`onchange="document.getElementById('deathFields').style.display=this.value==='Deceased'?'grid':'none'"`)+
+  select("Milking Status","milkingStatus",["Milking","Not Milking"],a.milkingStatus||"Milking")+
   field("Mother ID (optional — blood line ke liye)","motherId",a.motherId,"text",'list="animalIds"')+
   field("Father ID (optional)","fatherId",a.fatherId,"text",'list="animalIds"')+
   `<div id="deathFields" class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-xl bg-stone-50" style="display:${a.status==="Deceased"?"grid":"none"}">${field("Death Date","deathDate",a.deathDate,"date")}${field("Death Reason","deathReason",a.deathReason)}</div>`+
@@ -874,7 +884,7 @@ const recordFields={
  Deworming:[["animalId","Animal / Group","text",true],["date","Date","date"],["medicine","Medicine","text"],["nextDueDate","Next Due Date","date"],["dose","Dose","text"],["remarks","Remarks","text"]],
  "Tick Control":[["animalId","Animal / Group","text",true],["date","Date","date"],["product","Product","text"],["nextDueDate","Next Due Date","date"],["dose","Dose / Concentration","text"],["remarks","Remarks","text"]],
  "Nail Cutting":[["animalId","Animal / Group","text",true],["date","Date","date"],["intervalDays","Repeat Every (days)","number"],["nextDueDate","Next Due Date","date"],["doneBy","Done By","text"],["remarks","Remarks","text"]],
- Feed:[["name","Feed Item","text"],["unit","Unit (kg / bag / litre etc.)","text"],["minimumStock","Minimum Stock (isse kam hone par alert)","number"],["openingStock","Starting Stock (agar pehle se kuchh stock hai)","number"],["costPerUnit","Approx Cost per Unit ₹ (reference)","number"]],
+ Feed:[["name","Feed Name","text"],["quantity","Quantity","number"],["purchaseDate","Purchase Date","date"],["dailyUse","Daily Use","number"]],
  Sheds:[["name","Shed Name","text"],["capacity","Capacity","number"],["responsibleWorker","Responsible Worker","text"],["notes","Notes","text"]],
  Workers:[["name","Name","text"],["phone","Phone","text"],["role","Role","select:Worker|Manager|Veterinarian"],["shed","Assigned Shed","text"],["joiningDate","Joining Date","date"]],
  Tasks:[["title","Task","text"],["assignedTo","Assigned Worker","text"],["date","Date","date"],["priority","Priority","select:Low|Normal|High|Urgent"],["status","Status","select:Pending|In Progress|Completed|Skipped"],["notes","Notes","text"]],
@@ -977,14 +987,15 @@ function milkPage(){
    <button onclick="state.milkTab='insourceMonthly';renderPage()" class="btn ${state.milkTab==='insourceMonthly'?"btn-primary":"btn-soft"}">📅 Insource Monthly</button>
    <button onclick="state.milkTab='combined';renderPage()" class="btn ${state.milkTab==='combined'?"btn-primary":"btn-soft"}">🔗 Combined Total</button>
  </div>`;
- return pageHeader("Milk Production","Cow-wise daily doodh entry + bahar se insource kiya gaya doodh, sab ek jagah.","","Cow Milk tabs se apni cows ka doodh record karein. Insource tabs se bahar se (kisi vyakti/dairy/vendor se) khareeda/liya gaya doodh record karein — pehle 🚚 Insource Entry tab me '+ Add Source' se source (jaise doodhiye ya dairy ka naam) banayein, fir uske saamne roz ka morning/evening milk bharein. 🔗 Combined Total tab me cow + insource dono milakar total production month-wise dikhta hai.")
+ return pageHeader("Milk Production","Cow-wise daily doodh entry + bahar se insource kiya gaya doodh, sab ek jagah.","","Cow Milk tabs se apni cows ka doodh record karein (sirf 'Milking' status wali cows dikhti hain). Insource tabs se bahar se (kisi vyakti/dairy/vendor se) khareeda/liya gaya doodh record karein — pehle 🚚 Insource Entry tab me '+ Add Source' se source (jaise doodhiye ya dairy ka naam) banayein, fir uske saamne roz ka morning/evening milk bharein. 🔗 Combined Total tab me cow + insource dono milakar total production month-wise dikhta hai.")
  +`<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">${stat("Cow milk today",cowTodayTotal.toFixed(1)+" L","🥛")}${stat("Insource today",insrcTodayTotal.toFixed(1)+" L","🚚")}${stat("Combined today",(cowTodayTotal+insrcTodayTotal).toFixed(1)+" L","🔗")}${stat("Lactating cows",animals().filter(x=>x.status==="Lactating").length,"🐄")}</div>`
  +tabs
  +(state.milkTab==="history"?milkHistoryTab():state.milkTab==="monthly"?milkMonthlyTab():state.milkTab==="insource"?insourceEntryTab():state.milkTab==="insourceHistory"?insourceHistoryTab():state.milkTab==="insourceMonthly"?monthlyTotalTab("milkInsourceRecords"):state.milkTab==="combined"?combinedMilkTab():milkEntryTab());
 }
 function milkEntryTab(){
  const viewOnly=isModuleViewOnly("Milk");
- const cows=animals().filter(a=>a.gender==="Female"&&a.type!=="Calf").sort((a,b)=>(a.id||"").localeCompare(b.id||""));
+ // Sirf Milking cows (Not Milking aur Deceased cows yahan nahi aati; unka purana milk record safe rehta hai)
+ const cows=animals().filter(a=>a.gender==="Female"&&a.type!=="Calf"&&a.status!=="Deceased"&&isMilking(a)).sort((a,b)=>(a.id||"").localeCompare(b.id||""));
  const dateVal=state.milkDate;
  const rows=cows.map(a=>({a,rec:list("milkRecords").find(r=>r.animalId===a.id&&r.date===dateVal)}));
  const totalMorning=rows.reduce((s,r)=>s+Number(r.rec?.morning||0),0), totalEvening=rows.reduce((s,r)=>s+Number(r.rec?.evening||0),0);
@@ -997,7 +1008,7 @@ function milkEntryTab(){
     <div class="bg-stone-100 rounded-lg px-3 py-2"><span class="text-xs text-stone-600 block">Day total</span><b>${(totalMorning+totalEvening).toFixed(1)} L</b></div>
    </div>
   </div>
-  ${!cows.length?`<div class="py-14 text-center text-stone-500">Koi female animal registered nahi hai. Pehle Animals module me cow add karein.</div>`:`
+  ${!cows.length?`<div class="py-14 text-center text-stone-500">Koi milking cow nahi hai. Animals module me cow add karein ya uska "Milking Status" check karein.</div>`:`
   <div class="rtable overflow-auto"><table class="w-full text-sm" id="milkEntryTable">
    <thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Morning (L)</th><th class="p-3 text-left">Evening (L)</th><th class="p-3 text-left">Total</th></tr></thead>
    <tbody>${rows.map(({a,rec})=>`<tr class="border-b" data-animal="${esc(a.id)}"><td class="p-3 rt-main"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-green-50 grid place-items-center overflow-hidden shrink-0 ${a.photo?"cursor-pointer":""}" ${a.photo?`onclick="viewPhoto('${esc(a.photo)}','${esc(a.name||a.id)}')"`:""}>${a.photo?`<img class="w-10 h-10 rounded-lg object-cover" src="${esc(a.photo)}">`:"🐄"}</div><div><b>${esc(a.id)}</b><span class="block text-xs text-stone-500">${esc(a.name||"Unnamed")}${a.status?" · "+esc(a.status):""}</span></div></div></td>
@@ -1157,103 +1168,69 @@ function milkHistoryTab(){
   </table></div>`}
  </div>`;
 }
-// ---- Feed stock engine ----
-// Current stock = starting stock + every purchase - every daily-use entry, for that item.
-function feedPurchasesFor(itemId){return list("feedPurchases").filter(p=>p.feedItemId===itemId)}
-function feedUsageFor(itemId){return list("feedUsage").filter(u=>u.feedItemId===itemId)}
-function feedStock(itemId){
- const it=list("feedInventory").find(x=>x.id===itemId);
- const opening=it?Number(it.openingStock||0):0;
- const purchased=feedPurchasesFor(itemId).reduce((s,p)=>s+Number(p.quantity||0),0);
- const used=feedUsageFor(itemId).reduce((s,u)=>s+Number(u.quantity||0),0);
- return opening+purchased-used;
-}
-// Average daily usage over the last 14 recorded usage-days — used to predict a run-out date.
-function feedAvgDailyUsage(itemId){
- const rows=feedUsageFor(itemId).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).slice(0,14);
- if(!rows.length)return 0;
- const total=rows.reduce((s,u)=>s+Number(u.quantity||0),0);
- const days=new Set(rows.map(r=>r.date)).size||1;
- return total/days;
-}
-function feedDaysRemaining(itemId){
- const avg=feedAvgDailyUsage(itemId);
- if(avg<=0)return null;
- return Math.floor(feedStock(itemId)/avg);
-}
-function feedRunOutDate(itemId){
- const d=feedDaysRemaining(itemId);
- return d===null?null:addDays(today(),d);
+// ---- Feed (simple): naam, quantity, purchase date, daily use -> kitne din chalega + khatam hone ki date ----
+function feedCalc(it){
+ const q=Number(it.quantity||0), u=Number(it.dailyUse||0);
+ if(q<=0||u<=0||!it.purchaseDate)return null;
+ const days=Math.floor(q/u);
+ const finish=addDays(it.purchaseDate,days);
+ return {days,finish,left:daysTo(finish)};
 }
 function feedPage(){
- const items=list("feedInventory").sort((a,b)=>(a.name||"").localeCompare(b.name||""));
  const viewOnly=isModuleViewOnly("Feed");
- const header=pageHeader("Feed Management","Har feed item ka current stock, purchase aur daily usage ek jagah track karein.",
-   viewOnly?"":`<button class="btn btn-primary" onclick="openRecord('Feed')">＋ Add Feed Item</button>`,
-   "Pehle yahan feed item add karein (jaise Green Fodder, Bhusa, Khal). Fir uspar 📥 Purchase se jab bhi saman khareedein wo darj karein (kitni quantity, kitna total cost), aur 📤 Daily Use se roz ka istemal darj karein. App khud current stock aur andaazan kab khatam hoga calculate karti hai. Minimum Stock set karne par jab stock usse neeche jayega to Dashboard ke Alerts me dikhega.");
- if(!items.length)return header+`<div class="card p-5"><div class="py-14 text-center text-stone-500">Koi feed item nahi hai. Pehle ＋ Add Feed Item se item banayein.</div></div>`;
- const rowsHTML=items.map(it=>{
-  const stock=feedStock(it.id), avg=feedAvgDailyUsage(it.id), days=feedDaysRemaining(it.id), runOut=feedRunOutDate(it.id);
-  const min=Number(it.minimumStock||0);
-  const low=min>0&&stock<=min;
+ const items=list("feedInventory").map(it=>({it,c:feedCalc(it)})).sort((x,y)=>(x.c?x.c.left:99999)-(y.c?y.c.left:99999));
+ const header=pageHeader("Feed","Stock kitne din chalega aur kis date ko khatam hoga — usi hisaab se reorder karein.",
+   viewOnly?"":`<button class="btn btn-primary" onclick="openFeed()">＋ Add Feed Item</button>`);
+ if(!items.length)return header+`<div class="card p-5"><div class="py-14 text-center text-stone-500">Koi feed item nahi hai. ＋ Add Feed Item dabayein.</div></div>`;
+ const rows=items.map(({it,c})=>{
+  let leftTxt="—",status=`<span class="badge bg-stone-100 text-stone-700">Daily use bharein</span>`;
+  if(c){
+   leftTxt=c.left<0?`Khatam (${Math.abs(c.left)} din pehle)`:c.left===0?"Aaj khatam":c.left+" din";
+   status=c.left<=0?`<span class="badge bg-red-100 text-red-800">Khatam — reorder karein</span>`:c.left<=7?`<span class="badge bg-amber-100 text-amber-900">Jaldi reorder karein</span>`:`<span class="badge bg-[#e2edd8] text-[#2e4a1f]">OK</span>`;
+  }
   return `<tr class="border-b">
    <td class="p-3 rt-main"><b>${esc(it.name)}</b></td>
-   <td class="p-3" data-label="Unit">${esc(it.unit||"—")}</td>
-   <td class="p-3 font-semibold ${low?"text-red-700":""}" data-label="Current Stock">${stock.toFixed(1)} ${esc(it.unit||"")}</td>
-   <td class="p-3" data-label="Minimum">${min?min.toFixed(1)+" "+esc(it.unit||""):"—"}</td>
-   <td class="p-3" data-label="Avg Daily Use">${avg?avg.toFixed(2)+" / day":"—"}</td>
-   <td class="p-3" data-label="Khatam Hoga">${days===null?"—":days<=0?"Aaj/kal khatm ho sakta hai":days+" din · "+fmt(runOut)}</td>
-   <td class="p-3" data-label="Status">${low?`<span class="badge bg-red-100 text-red-800" title="Stock minimum se kam ya barabar hai">Low Stock</span>`:`<span class="badge bg-[#e2edd8] text-[#2e4a1f]">OK</span>`}</td>
-   <td class="p-3 text-right rt-actions"><div class="flex gap-2 justify-end flex-wrap">
-    ${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<button class="btn btn-soft !p-2" onclick="openFeedPurchase('${esc(it.id)}')">📥 Purchase</button><button class="btn btn-soft !p-2" onclick="openFeedUsage('${esc(it.id)}')">📤 Daily Use</button><button class="btn btn-soft !p-2" onclick="openRecord('Feed','${esc(it.id)}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Feed','${esc(it.id)}')">Delete</button>`}
-   </div></td>
+   <td class="p-3" data-label="Quantity">${esc(it.quantity||"—")}</td>
+   <td class="p-3" data-label="Purchase Date">${fmt(it.purchaseDate)}</td>
+   <td class="p-3" data-label="Daily Use">${esc(it.dailyUse||"—")}</td>
+   <td class="p-3" data-label="Kitne din chalega">${c?c.days+" din":"—"}</td>
+   <td class="p-3 font-semibold" data-label="Khatam hone ki date">${c?fmt(c.finish):"—"}</td>
+   <td class="p-3" data-label="Bacha hua">${leftTxt}</td>
+   <td class="p-3" data-label="Status">${status}</td>
+   <td class="p-3 text-right rt-actions">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openFeed('${esc(it.id)}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Feed','${esc(it.id)}')">Delete</button></div>`}</td>
   </tr>`;
  }).join("");
- const table=`<div class="card p-5 rtable overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-stone-500">
-  <th class="p-3 text-left">Item</th><th class="p-3 text-left">Unit</th><th class="p-3 text-left" title="${esc(FIELD_MEANINGS.quantity)}">Current Stock</th><th class="p-3 text-left" title="${esc(FIELD_MEANINGS.minimumStock)}">Minimum</th><th class="p-3 text-left">Avg Daily Use</th><th class="p-3 text-left">Khatam Hoga</th><th class="p-3 text-left">Status</th><th></th>
- </tr></thead><tbody>${rowsHTML}</tbody></table></div>`;
- return header+table;
+ return header+`<div class="card p-5 rtable overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-stone-500">
+  <th class="p-3 text-left">Feed</th><th class="p-3 text-left">Quantity</th><th class="p-3 text-left">Purchase Date</th><th class="p-3 text-left">Daily Use</th><th class="p-3 text-left">Kitne din chalega</th><th class="p-3 text-left">Khatam hone ki date</th><th class="p-3 text-left">Bacha hua</th><th class="p-3 text-left">Status</th><th></th>
+ </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
-function openFeedPurchase(itemId){
+function openFeed(key){
  if(isModuleViewOnly("Feed")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
- const it=list("feedInventory").find(x=>x.id===itemId);
- if(!it){toast("Feed item nahi mila",false);return}
- modal(`📥 Purchase — ${esc(it.name)}`,formGrid(
-  field("Purchase Date","date",today(),"date")+
-  field(`Quantity Purchased (${esc(it.unit||"unit")})`,"quantity","","number","min='0' step='0.01'")+
-  field("Total Cost (₹)","totalCost","","number","min='0' step='0.01'")+
-  field("Vendor / Notes (optional)","notes","")
- ),`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitFeedPurchase('${esc(itemId)}')">Save Purchase</button>`);
+ const it=key?list("feedInventory").find(x=>x.id===key):null;
+ const num="min='0' step='0.01' inputmode='decimal'";
+ modal(key?"Edit Feed Item":"Add Feed Item",formGrid(
+  field("Feed Name","name",it?it.name:"")+
+  field("Quantity","quantity",it?it.quantity:"","number",num)+
+  field("Purchase Date","purchaseDate",it?it.purchaseDate:today(),"date")+
+  field("Daily Use (roz kitna lagega)","dailyUse",it?it.dailyUse:"","number",num)+
+  `<div class="md:col-span-2 p-4 bg-green-50 rounded-xl"><span class="text-xs text-green-700">Stock kitne din chalega / kab khatam hoga</span><b id="feedPreview" class="block text-lg text-green-900 mt-1">Quantity aur daily use bharein</b></div>`
+ ),`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitFeed('${key||""}')">Save</button>`);
+ document.querySelectorAll("#modalRoot [name=quantity],#modalRoot [name=purchaseDate],#modalRoot [name=dailyUse]").forEach(i=>i.addEventListener("input",updateFeedPreview));
+ updateFeedPreview();
 }
-async function submitFeedPurchase(itemId){
+function updateFeedPreview(){
+ const r=document.getElementById("modalRoot"),el=document.getElementById("feedPreview");if(!r||!el)return;
+ const c=feedCalc({quantity:r.querySelector("[name=quantity]").value,purchaseDate:r.querySelector("[name=purchaseDate]").value,dailyUse:r.querySelector("[name=dailyUse]").value});
+ el.textContent=c?`${c.days} din chalega · ${fmt(c.finish)} ko khatam hoga`:"Quantity aur daily use bharein";
+}
+async function submitFeed(key){
  const r=document.getElementById("modalRoot");
- const date=r.querySelector('[name=date]').value, quantity=Number(r.querySelector('[name=quantity]').value||0), totalCost=Number(r.querySelector('[name=totalCost]').value||0), notes=r.querySelector('[name=notes]').value;
- if(!date||quantity<=0){toast("Date aur valid quantity zaroori hai",false);return}
- try{
-  await save("feedPurchases",id("FPUR"),{feedItemId:itemId,date,quantity,totalCost,ratePerUnit:quantity?+(totalCost/quantity).toFixed(2):0,notes});
-  toast("Purchase saved — stock update ho gaya");closeModal();
- }catch(e){toast(e.message,false)}
+ const name=r.querySelector("[name=name]").value.trim(), quantity=Number(r.querySelector("[name=quantity]").value||0), purchaseDate=r.querySelector("[name=purchaseDate]").value, dailyUse=Number(r.querySelector("[name=dailyUse]").value||0);
+ if(!name){toast("Feed name zaroori hai",false);return}
+ if(quantity<=0||dailyUse<=0||!purchaseDate){toast("Quantity, purchase date aur daily use sahi bharein",false);return}
+ try{await save("feedInventory",key||id("FEED"),{name,quantity,purchaseDate,dailyUse});toast("Feed saved");closeModal()}catch(e){toast(e.message,false)}
 }
-function openFeedUsage(itemId){
- if(isModuleViewOnly("Feed")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
- const it=list("feedInventory").find(x=>x.id===itemId);
- if(!it){toast("Feed item nahi mila",false);return}
- const stock=feedStock(itemId);
- modal(`📤 Daily Use — ${esc(it.name)}`,formGrid(
-  field("Date","date",today(),"date")+
-  field(`Quantity Used (${esc(it.unit||"unit")}) — Available: ${stock.toFixed(1)}`,"quantity","","number","min='0' step='0.01'")
- ),`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitFeedUsage('${esc(itemId)}')">Save Usage</button>`);
-}
-async function submitFeedUsage(itemId){
- const r=document.getElementById("modalRoot");
- const date=r.querySelector('[name=date]').value, quantity=Number(r.querySelector('[name=quantity]').value||0);
- if(!date||quantity<=0){toast("Date aur valid quantity zaroori hai",false);return}
- try{
-  await save("feedUsage",id("FUSE"),{feedItemId:itemId,date,quantity});
-  toast("Usage saved — stock update ho gaya");closeModal();
- }catch(e){toast(e.message,false)}
-}
-window.openFeedPurchase=openFeedPurchase;window.submitFeedPurchase=submitFeedPurchase;window.openFeedUsage=openFeedUsage;window.submitFeedUsage=submitFeedUsage;
+window.openFeed=openFeed;window.submitFeed=submitFeed;
 
 function reportsPage(){
  const a=animals().filter(x=>x.status!=="Deceased"), exp=list("expenses").reduce((s,x)=>s+Number(x.amount||0),0), milk=list("milkRecords").reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
@@ -1483,9 +1460,7 @@ const REPORT_CONFIGS={
   const months=Array.from(new Set([...Object.keys(cowMap),...Object.keys(insMap)])).sort((a,b)=>b.localeCompare(a));
   return months.map(m=>({month:m,cow:(cowMap[m]||0).toFixed(1),insource:(insMap[m]||0).toFixed(1),combined:((cowMap[m]||0)+(insMap[m]||0)).toFixed(1)}));
  },columns:[["Month","month"],["Cow Milk (L)","cow"],["Insource Milk (L)","insource"],["Combined Total (L)","combined"]]},
- "Feed Stock Summary":{rows:()=>list("feedInventory").map(it=>{const stock=feedStock(it.id),min=Number(it.minimumStock||0);return {name:it.name,unit:it.unit,stock:stock.toFixed(1),minimumStock:it.minimumStock||"—",avgDailyUsage:feedAvgDailyUsage(it.id).toFixed(2),status:(min&&stock<=min)?"Low Stock":"OK"}}),columns:[["Feed Item","name"],["Unit","unit"],["Current Stock","stock"],["Minimum Stock","minimumStock"],["Avg Daily Usage","avgDailyUsage"],["Status","status"]]},
- "Feed Purchases":{rows:()=>list("feedPurchases").sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(r=>({...r,itemName:(list("feedInventory").find(x=>x.id===r.feedItemId)||{}).name||r.feedItemId})),columns:[["Date","date"],["Feed Item","itemName"],["Quantity","quantity"],["Total Cost","totalCost"],["Rate/Unit","ratePerUnit"],["Notes","notes"]]},
- "Feed Daily Usage":{rows:()=>list("feedUsage").sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(r=>({...r,itemName:(list("feedInventory").find(x=>x.id===r.feedItemId)||{}).name||r.feedItemId})),columns:[["Date","date"],["Feed Item","itemName"],["Quantity Used","quantity"]]},
+ "Feed Stock":{rows:()=>list("feedInventory").map(it=>{const f=feedCalc(it);return {name:it.name,quantity:it.quantity,purchaseDate:it.purchaseDate,dailyUse:it.dailyUse,days:f?f.days:"—",finishDate:f?f.finish:""}}),columns:[["Feed","name"],["Quantity","quantity"],["Purchase Date","purchaseDate"],["Daily Use","dailyUse"],["Lasts (days)","days"],["Finish Date","finishDate"]]},
  "Medical Treatment":{rows:()=>list("healthChecks"),columns:[["Animal ID","animalId"],["Date","date"],["Status","status"],["Temperature","temperature"],["Remarks","remarks"]]},
  "Vaccination":{rows:()=>list("vaccinations"),columns:[["Animal / Group","animalId"],["Vaccine","vaccine"],["Date","date"],["Next Due","nextDueDate"],["Batch","batch"]]},
  "Deworming":{rows:()=>list("deworming"),columns:[["Animal / Group","animalId"],["Date","date"],["Medicine","medicine"],["Next Due","nextDueDate"],["Dose","dose"]]},
