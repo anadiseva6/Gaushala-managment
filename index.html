@@ -284,7 +284,7 @@ function infoIcon(text){
 document.addEventListener("click",e=>{
  document.querySelectorAll("details.info[open]").forEach(d=>{if(!d.contains(e.target))d.removeAttribute("open")});
 });
-const paths=["animals","pregnancies","calvings","milkRecords","milkSources","milkInsourceRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog","appConfig"];
+const paths=["animals","pregnancies","calvings","milkRecords","milkSources","milkInsourceRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog","appConfig","feedPurchases"];
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function id(prefix){return prefix+"-"+Math.random().toString(36).slice(2,7).toUpperCase()}
@@ -524,6 +524,8 @@ const FIELD_MEANINGS={
  intervalDays:"Kitne dino baad yeh kaam dobara karna chahiye.",
  doneBy:"Yeh kaam kisne kiya (worker ka naam).",
  unit:"Quantity kis unit mein measure hoti hai — jaise kg, bag, litre.",
+ unitsReceived:"Kitne unit aaye — jaise 10 bottle, 5 strip, 2 packet. Sirf number likhein.",
+ quantityReceived:"Har unit/total me kitni quantity hai — jaise 100 ml, 10 tablet, 500 gm.",
  minimumStock:"Jab current stock isse kam ho jaaye to alert mil jayega.",
  openingStock:"Jab yeh item pehli baar record kiya tab kitna stock tha (optional).",
  costPerUnit:"Ek unit (jaise 1 kg) ki approx cost — sirf reference ke liye, asli cost purchase entry se aati hai.",
@@ -872,7 +874,7 @@ function simplePage(type){
  const configs={
   Calves:["Calf Management","Birth, mother linkage, weight, growth and preventive care.","births","＋ Add Birth","Naye baby calf ka birth record yahan banayein — kis cow ne janm diya, kab, gender aur weight kitna tha."],
   Health:["Health & Health Checks","Daily observation, sick alerts, treatment and follow-up.","healthChecks","＋ Health Check","Kisi bhi animal ko halki si bhi problem lage toh yahan health check record karein — 'Sick' ya 'Emergency' mark karne par uska status automatically update ho jayega."],
-  Medicines:["Medicines & Treatment","Medicine inventory, treatment history and expiry tracking.","medicines","＋ Medicine","Gaushala mein rakhi saari dawaiyon ka stock aur unki expiry date yahan track karein, taaki koi dawa expire hone se pehle pata chal jaaye."],
+  Medicines:["Medicines Purchase","Kab kaunsi dawa kitni aur kitne ki khareedi — sab permanent record.","medicines","＋ Medicine Purchase","Gaushala mein rakhi saari dawaiyon ka stock aur unki expiry date yahan track karein, taaki koi dawa expire hone se pehle pata chal jaaye."],
   Vaccination:["Vaccination","Individual/group vaccination and next due dates.","vaccinations","＋ Vaccination","Kaunsi vaccine kab lagi aur agli baar kab lagni hai — yahan record rakhein taaki koi vaccine miss na ho."],
   Deworming:["Deworming","Configurable schedule; current 5-month interval can be used but remains editable.","deworming","＋ Deworming","Pet ke keede nikalne ki dawa (deworming) kab di gayi aur agli baar kab deni hai — yahan track karein."],
   "Tick Control":["Tick / Chichdi Control","Spray records; current 4-month plan remains configurable.","tickControl","＋ Record Spray","Chichdi/tick control spray kab kiya gaya aur agli baar kab karna hai — yahan record karein."],
@@ -884,9 +886,11 @@ function simplePage(type){
   Expenses:["Expenses & Income","Feed, medicines, labour, utilities, donations and other finance.","expenses","＋ Expense","Chara, dawai, labour, bijli-paani jaisa har kharcha yahan darj karein taaki gaushala ka pura hisaab-kitab mile."],
  };
  const c=configs[type];let rows=list(c[2]);if(state.search){let q=state.search.toLowerCase();rows=rows.filter(x=>JSON.stringify(x).toLowerCase().includes(q))}
+ if(type==="Medicines")rows.sort((a,b)=>(b.purchaseDate||"").localeCompare(a.purchaseDate||""));
+ const medTotal=type==="Medicines"?` · Total: <b>₹${rows.reduce((s,x)=>s+Number(x.amount||0),0).toLocaleString("en-IN")}</b>`:"";
  const headerBtn=isModuleViewOnly(type)?"":`<div class="flex gap-2">${type==="Calves"?`<button class="btn btn-soft" onclick="repairCalfLinks()">🔧 Fix Missing Calf Links</button>`:""}<button class="btn btn-primary" onclick="openRecord('${type}')">${c[3]}</button></div>`;
  return pageHeader(c[0],c[1],headerBtn,c[4])
- +`<div class="card p-5"><div class="flex items-center justify-between mb-4 gap-3 flex-wrap"><span class="text-sm text-stone-600">${rows.length} records</span><input class="input !w-64 max-w-full flex-1 sm:flex-none" placeholder="Filter records" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div>${genericTable(type,rows)}</div>`
+ +`<div class="card p-5"><div class="flex items-center justify-between mb-4 gap-3 flex-wrap"><span class="text-sm text-stone-600">${rows.length} records${medTotal}</span><input class="input !w-64 max-w-full flex-1 sm:flex-none" placeholder="Filter records" value="${esc(state.search)}" oninput="state.search=this.value;renderPage()"></div>${genericTable(type,rows)}</div>`
 }
 function genericTable(type,rows){
  if(!rows.length)return `<div class="py-14 text-center text-stone-500">No records yet. Add the first record.</div>`;
@@ -904,7 +908,7 @@ const recordPaths={Calves:"births",Health:"healthChecks",Medicines:"medicines",V
 const recordFields={
  Calves:[["animalId","Mother ID","text",true],["calfId","Calf ID (optional, auto-generated if blank)","text"],["birthDate","Birth Date","date"],["gender","Gender","select:Male|Female"],["birthWeight","Birth Weight (kg)","number"],["notes","Notes","text"]],
  Health:[["animalId","Animal ID","text",true],["date","Date","date"],["status","Status","select:Normal|Watch|Sick|Emergency"],["temperature","Temperature","number"],["remarks","Remarks","text"]],
- Medicines:[["name","Medicine Name","text"],["batch","Batch Number","text"],["quantity","Quantity","number"],["unit","Unit","text"],["expiryDate","Expiry Date","date"],["minimumStock","Minimum Stock","number"]],
+ Medicines:[["purchaseDate","Date of Purchase","date"],["name","Medicine Name","text"],["unitsReceived","Unit (kitne aaye)","number"],["quantityReceived","Quantity (kitni quantity)","text"],["amount","Amount (₹)","number"]],
  Vaccination:[["animalId","Animal / Group","text",true],["vaccine","Vaccine Name","text"],["date","Date","date"],["nextDueDate","Next Due Date","date"],["batch","Batch Number","text"],["remarks","Remarks","text"]],
  Deworming:[["animalId","Animal / Group","text",true],["date","Date","date"],["medicine","Medicine","text"],["nextDueDate","Next Due Date","date"],["dose","Dose","text"],["remarks","Remarks","text"]],
  "Tick Control":[["animalId","Animal / Group","text",true],["date","Date","date"],["product","Product","text"],["nextDueDate","Next Due Date","date"],["dose","Dose / Concentration","text"],["remarks","Remarks","text"]],
@@ -938,6 +942,7 @@ async function submitRecord(type,key){
  let d={};document.querySelectorAll("#modalRoot [name]").forEach(x=>d[x.name]=x.value);
  const [requiredName,requiredLabel]=fields[0];
  if(!d[requiredName]){toast(`${requiredLabel} is required`,false);return}
+ if(type==="Medicines"&&!(d.name||"").trim()){toast("Medicine name zaroori hai",false);return}
  if(!key)d.createdAt=new Date().toISOString();
  try{
   if(type==="Health"&&["Sick","Emergency"].includes(d.status)){let a=findAnimal(d.animalId);if(a)await db.ref("animals/"+a.id).update({status:d.status})}
@@ -1206,7 +1211,8 @@ function feedPage(){
  const items=list("feedInventory").map(it=>({it,c:feedCalc(it)})).sort((x,y)=>(x.c?x.c.left:99999)-(y.c?y.c.left:99999));
  const header=pageHeader("Feed","Stock kitne din chalega aur kis date ko khatam hoga — usi hisaab se reorder karein.",
    viewOnly?"":`<button class="btn btn-primary" onclick="openFeed()">＋ Add Feed Item</button>`);
- if(!items.length)return header+`<div class="card p-5"><div class="py-14 text-center text-stone-500">Koi feed item nahi hai. ＋ Add Feed Item dabayein.</div></div>`;
+ const histCard=feedHistoryCard();
+ if(!items.length)return header+`<div class="card p-5"><div class="py-14 text-center text-stone-500">Koi feed item nahi hai. ＋ Add Feed Item dabayein.</div></div>`+histCard;
  const rows=items.map(({it,c})=>{
   let leftTxt="—",status=`<span class="badge bg-stone-100 text-stone-700">Daily use bharein</span>`;
   if(c){
@@ -1222,12 +1228,12 @@ function feedPage(){
    <td class="p-3 font-semibold" data-label="Khatam hone ki date">${c?fmt(c.finish):"—"}</td>
    <td class="p-3" data-label="Bacha hua">${leftTxt}</td>
    <td class="p-3" data-label="Status">${status}</td>
-   <td class="p-3 text-right rt-actions">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end"><button class="btn btn-soft !p-2" onclick="openFeed('${esc(it.id)}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Feed','${esc(it.id)}')">Delete</button></div>`}</td>
+   <td class="p-3 text-right rt-actions">${viewOnly?`<span class="text-xs text-stone-500">View only</span>`:`<div class="flex gap-2 justify-end flex-wrap"><button class="btn btn-primary !p-2" onclick="openFeedRefill('${esc(it.id)}')">🔄 Refill</button><button class="btn btn-soft !p-2" onclick="openFeed('${esc(it.id)}')">Edit</button><button class="btn btn-danger !p-2" onclick="deleteRecord('Feed','${esc(it.id)}')">Delete</button></div>`}</td>
   </tr>`;
  }).join("");
  return header+`<div class="card p-5 rtable overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-stone-500">
   <th class="p-3 text-left">Feed</th><th class="p-3 text-left">Quantity</th><th class="p-3 text-left">Purchase Date</th><th class="p-3 text-left">Daily Use</th><th class="p-3 text-left">Kitne din chalega</th><th class="p-3 text-left">Khatam hone ki date</th><th class="p-3 text-left">Bacha hua</th><th class="p-3 text-left">Status</th><th></th>
- </tr></thead><tbody>${rows}</tbody></table></div>`;
+ </tr></thead><tbody>${rows}</tbody></table></div>`+histCard;
 }
 function openFeed(key){
  if(isModuleViewOnly("Feed")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
@@ -1238,6 +1244,7 @@ function openFeed(key){
   field("Quantity","quantity",it?it.quantity:"","number",num)+
   field("Purchase Date","purchaseDate",it?it.purchaseDate:today(),"date")+
   field("Daily Use (roz kitna lagega)","dailyUse",it?it.dailyUse:"","number",num)+
+  (key?"":field("Amount ₹ (optional)","amount","","number",num)+field("Vendor / Dukaan (optional)","vendor",""))+
   `<div class="md:col-span-2 p-4 bg-green-50 rounded-xl"><span class="text-xs text-green-700">Stock kitne din chalega / kab khatam hoga</span><b id="feedPreview" class="block text-lg text-green-900 mt-1">Quantity aur daily use bharein</b></div>`
  ),`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitFeed('${key||""}')">Save</button>`);
  document.querySelectorAll("#modalRoot [name=quantity],#modalRoot [name=purchaseDate],#modalRoot [name=dailyUse]").forEach(i=>i.addEventListener("input",updateFeedPreview));
@@ -1253,9 +1260,73 @@ async function submitFeed(key){
  const name=r.querySelector("[name=name]").value.trim(), quantity=Number(r.querySelector("[name=quantity]").value||0), purchaseDate=r.querySelector("[name=purchaseDate]").value, dailyUse=Number(r.querySelector("[name=dailyUse]").value||0);
  if(!name){toast("Feed name zaroori hai",false);return}
  if(quantity<=0||dailyUse<=0||!purchaseDate){toast("Quantity, purchase date aur daily use sahi bharein",false);return}
- try{await save("feedInventory",key||id("FEED"),{name,quantity,purchaseDate,dailyUse});toast("Feed saved");closeModal()}catch(e){toast(e.message,false)}
+ try{
+  const fk=key||id("FEED");
+  await save("feedInventory",fk,{name,quantity,purchaseDate,dailyUse});
+  if(!key){ // naya feed item = pehli purchase, history me bhi chadhao
+   const pid=id("FPUR");
+   await save("feedPurchases",pid,{feedId:fk,feedName:name,date:purchaseDate,quantity,amount:Number(r.querySelector("[name=amount]")?.value||0),vendor:(r.querySelector("[name=vendor]")?.value||"").trim(),stockBefore:0,stockAfter:quantity});
+  }
+  toast("Feed saved");closeModal();
+ }catch(e){toast(e.message,false)}
 }
-window.openFeed=openFeed;window.submitFeed=submitFeed;
+// Purani quantity me se abhi kitna bacha hai (purchase date se aaj/refill date tak daily use ghata kar)
+function feedRemaining(it,onDate){
+ const days=Math.max(0,Math.floor((new Date(onDate+"T00:00:00")-new Date(it.purchaseDate+"T00:00:00"))/86400000));
+ return Math.max(0,Number(it.quantity||0)-days*Number(it.dailyUse||0));
+}
+function openFeedRefill(key){
+ if(isModuleViewOnly("Feed")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
+ const it=list("feedInventory").find(x=>x.id===key);if(!it)return;
+ const num="min='0' step='0.01' inputmode='decimal'";
+ modal(`Refill — ${esc(it.name)}`,formGrid(
+  field("Refill / Purchase Date","refillDate",today(),"date")+
+  field("Kitna aaya (Quantity)","refillQty","","number",num)+
+  field("Amount ₹ (optional)","refillAmount","","number",num)+
+  field("Vendor / Dukaan (optional)","refillVendor","")+
+  `<div class="md:col-span-2 p-4 bg-green-50 rounded-xl"><span class="text-xs text-green-700">Refill ke baad</span><b id="refillPreview" class="block text-base text-green-900 mt-1">Quantity bharein</b></div>`
+ ),`<button class="btn btn-soft" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitFeedRefill('${esc(key)}')">Save Refill</button>`);
+ const upd=()=>{
+  const r=document.getElementById("modalRoot"),el=document.getElementById("refillPreview");if(!r||!el)return;
+  const date=r.querySelector("[name=refillDate]").value,q=Number(r.querySelector("[name=refillQty]").value||0);
+  if(!date||q<=0){el.textContent="Quantity bharein";return}
+  const rem=feedRemaining(it,date),total=rem+q,c=feedCalc({quantity:total,purchaseDate:date,dailyUse:it.dailyUse});
+  el.textContent=`Pehle bacha ≈ ${+rem.toFixed(1)} + naya ${q} = ${+total.toFixed(1)}`+(c?` · ${c.days} din chalega · ${fmt(c.finish)} ko khatam hoga`:"");
+ };
+ document.querySelectorAll("#modalRoot [name=refillDate],#modalRoot [name=refillQty]").forEach(i=>i.addEventListener("input",upd));
+}
+async function submitFeedRefill(key){
+ if(isModuleViewOnly("Feed")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
+ const it=list("feedInventory").find(x=>x.id===key);if(!it)return;
+ const r=document.getElementById("modalRoot");
+ const date=r.querySelector("[name=refillDate]").value,qty=Number(r.querySelector("[name=refillQty]").value||0),amount=Number(r.querySelector("[name=refillAmount]").value||0),vendor=r.querySelector("[name=refillVendor]").value.trim();
+ if(!date||qty<=0){toast("Date aur quantity sahi bharein",false);return}
+ const rem=+feedRemaining(it,date).toFixed(2),newQty=+(rem+qty).toFixed(2);
+ try{
+  await save("feedPurchases",id("FPUR"),{feedId:key,feedName:it.name,date,quantity:qty,amount,vendor,stockBefore:rem,stockAfter:newQty});
+  await save("feedInventory",key,{...it,quantity:newQty,purchaseDate:date});
+  toast("Refill save ho gaya");closeModal();
+ }catch(e){toast(e.message,false)}
+}
+async function deleteFeedPurchase(key){
+ if(isModuleViewOnly("Feed")){toast(`${state.role} role ke paas yeh permission nahi hai`,false);return}
+ if(!confirm("Is purchase entry ko history se hata dein? (Feed stock par asar nahi padega)"))return;
+ try{await remove("feedPurchases",key);toast("Deleted")}catch(e){toast(e.message,false)}
+}
+function feedHistoryCard(){
+ const viewOnly=isModuleViewOnly("Feed");
+ const all=list("feedPurchases");
+ const names=[...new Set(all.map(x=>x.feedName).filter(Boolean))].sort();
+ const f=state.feedHistFilter&&names.includes(state.feedHistFilter)?state.feedHistFilter:"";
+ const rows=all.filter(x=>!f||x.feedName===f).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+ const totQty=rows.reduce((s,x)=>s+Number(x.quantity||0),0),totAmt=rows.reduce((s,x)=>s+Number(x.amount||0),0);
+ const head=`<div class="flex items-center justify-between gap-3 flex-wrap mb-4"><div><h3 class="font-bold">📜 Purchase / Refill History</h3><p class="text-xs text-stone-500">Kab kab kitna feed order ya purchase kiya — sab yahan permanent save rehta hai.</p></div><select class="input !w-52 max-w-full" onchange="state.feedHistFilter=this.value;renderPage()"><option value="">Saare feed</option>${names.map(n=>`<option value="${esc(n)}"${n===f?" selected":""}>${esc(n)}</option>`).join("")}</select></div>`;
+ if(!rows.length)return `<div class="card p-5 mt-5">${head}<div class="py-8 text-center text-stone-500 text-sm">Abhi koi purchase history nahi. Kisi feed par 🔄 Refill dabayein.</div></div>`;
+ return `<div class="card p-5 mt-5">${head}
+  <div class="grid grid-cols-3 gap-3 mb-4">${stat("Orders",rows.length,"🧾")}${stat("Total Quantity",+totQty.toFixed(2),"🌾")}${stat("Total Amount","₹"+totAmt.toLocaleString("en-IN"),"₹")}</div>
+  <div class="rtable overflow-auto"><table class="w-full text-sm"><thead><tr class="border-b text-xs uppercase text-stone-500"><th class="p-3 text-left">Date</th><th class="p-3 text-left">Feed</th><th class="p-3 text-left">Quantity</th><th class="p-3 text-left">Amount (₹)</th><th class="p-3 text-left">Vendor</th><th class="p-3 text-left">Stock before → after</th><th></th></tr></thead><tbody>${rows.map(x=>`<tr class="border-b"><td class="p-3 rt-main"><b>${fmt(x.date)}</b></td><td class="p-3" data-label="Feed">${esc(x.feedName||"—")}</td><td class="p-3" data-label="Quantity">${esc(x.quantity)}</td><td class="p-3" data-label="Amount">${x.amount?"₹"+Number(x.amount).toLocaleString("en-IN"):"—"}</td><td class="p-3" data-label="Vendor">${esc(x.vendor||"—")}</td><td class="p-3" data-label="Stock">${esc(+Number(x.stockBefore||0).toFixed(1))} → ${esc(+Number(x.stockAfter||0).toFixed(1))}</td><td class="p-3 text-right rt-actions">${viewOnly?"":`<button class="btn btn-danger !p-2" onclick="deleteFeedPurchase('${esc(x.id)}')">Delete</button>`}</td></tr>`).join("")}</tbody></table></div></div>`;
+}
+window.openFeed=openFeed;window.submitFeed=submitFeed;window.openFeedRefill=openFeedRefill;window.submitFeedRefill=submitFeedRefill;window.deleteFeedPurchase=deleteFeedPurchase;
 
 function reportsPage(){
  const a=animals().filter(x=>x.status!=="Deceased"), exp=list("expenses").reduce((s,x)=>s+Number(x.amount||0),0), milk=list("milkRecords").reduce((s,x)=>s+Number(x.morning||0)+Number(x.evening||0),0);
@@ -1514,6 +1585,8 @@ const REPORT_CONFIGS={
   return months.map(m=>({month:m,cow:(cowMap[m]||0).toFixed(1),insource:(insMap[m]||0).toFixed(1),combined:((cowMap[m]||0)+(insMap[m]||0)).toFixed(1)}));
  },columns:[["Month","month"],["Cow Milk (L)","cow"],["Insource Milk (L)","insource"],["Combined Total (L)","combined"]]},
  "Feed Stock":{rows:()=>list("feedInventory").map(it=>{const f=feedCalc(it);return {name:it.name,quantity:it.quantity,purchaseDate:it.purchaseDate,dailyUse:it.dailyUse,days:f?f.days:"—",finishDate:f?f.finish:""}}),columns:[["Feed","name"],["Quantity","quantity"],["Purchase Date","purchaseDate"],["Daily Use","dailyUse"],["Lasts (days)","days"],["Finish Date","finishDate"]]},
+ "Medicine Purchases":{rows:()=>list("medicines").sort((a,b)=>(b.purchaseDate||"").localeCompare(a.purchaseDate||"")),columns:[["Date","purchaseDate"],["Medicine","name"],["Unit","unitsReceived"],["Quantity","quantityReceived"],["Amount (Rs)","amount"]]},
+ "Feed Purchases":{rows:()=>list("feedPurchases").sort((a,b)=>(b.date||"").localeCompare(a.date||"")),columns:[["Date","date"],["Feed","feedName"],["Quantity","quantity"],["Amount (Rs)","amount"],["Vendor","vendor"]]},
  "Medical Treatment":{rows:()=>list("healthChecks"),columns:[["Animal ID","animalId"],["Date","date"],["Status","status"],["Temperature","temperature"],["Remarks","remarks"]]},
  "Vaccination":{rows:()=>list("vaccinations"),columns:[["Animal / Group","animalId"],["Vaccine","vaccine"],["Date","date"],["Next Due","nextDueDate"],["Batch","batch"]]},
  "Deworming":{rows:()=>list("deworming"),columns:[["Animal / Group","animalId"],["Date","date"],["Medicine","medicine"],["Next Due","nextDueDate"],["Dose","dose"]]},
