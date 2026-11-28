@@ -190,14 +190,34 @@ const ROLE_PERMISSIONS={
  "Owner":null,
  "Management Team":{onlyModules:["Milk"]}
 };
-function currentPermissions(){return ROLE_PERMISSIONS[state.role]||null}
+// ---- Management Team access: Owner decides, per module, from Settings -> "Management Team Access".
+// Stored in Firebase (appConfig/managementAccess) so it syncs to every Management device.
+// Each module is "hidden" | "view" (sirf dekh sakte hain) | "edit" (add/edit/delete bhi).
+const MGMT_DEFAULT={Milk:"edit"};
+const OWNER_ONLY_MODULES=["Settings"]; // yeh kabhi Management Team ko nahi diye ja sakte
+function mgmtAccess(){
+ const c=(state.data.appConfig||{}).managementAccess;
+ return (c&&Object.keys(c).length)?c:MGMT_DEFAULT;
+}
+function currentPermissions(){
+ if(state.role==="Management Team"){
+  const a=mgmtAccess();
+  const shown=Object.keys(a).filter(k=>(a[k]==="view"||a[k]==="edit")&&!OWNER_ONLY_MODULES.includes(k));
+  return {onlyModules:shown,viewOnly:shown.filter(k=>a[k]==="view")};
+ }
+ return ROLE_PERMISSIONS[state.role]||null;
+}
+function firstAllowedPage(){
+ const order=["Dashboard"].concat(...NAV_GROUPS.map(g=>g[1]));
+ return order.find(k=>modules[k]&&!isModuleHidden(k))||"Dashboard";
+}
 function isModuleHidden(m){
  const p=currentPermissions();
  if(!p)return false;
  if(p.onlyModules)return !p.onlyModules.includes(m);
  return !!(p.hiddenModules&&p.hiddenModules.includes(m));
 }
-function isModuleViewOnly(m){const p=currentPermissions();return !!(p&&p.viewOnly&&p.viewOnly.includes(m))}
+function isModuleViewOnly(m){const p=currentPermissions();return !!(p&&(isModuleHidden(m)||(p.viewOnly&&p.viewOnly.includes(m))))}
 // Some record "types" used with the generic openRecord/deleteRecord/genericTable helpers
 // aren't real nav modules (e.g. MilkSources lives inside the Milk page), so their
 // permission check should fall back to whichever nav module they logically belong to.
@@ -219,11 +239,11 @@ function loginScreen(){
      </button>
      <button class="btn btn-soft w-full justify-start !py-3.5 !px-4" onclick="attemptLogin('Management Team')">
       <span class="w-9 h-9 rounded-lg bg-white grid place-items-center text-lg shrink-0 border" style="border-color:#e2e6d5">🥛</span>
-      <span class="text-left"><span class="block">Management Team</span><span class="block text-xs font-medium opacity-70">Milk entry only · no password</span></span>
+      <span class="text-left"><span class="block">Management Team</span><span class="block text-xs font-medium opacity-70">Owner ke diye hue modules · no password</span></span>
      </button>
     </div>
    </div>
-   <p class="text-xs text-center mt-5" style="color:var(--ink-soft)">Management Team can only record milk. Every other module is Owner-only.</p>
+   <p class="text-xs text-center mt-5" style="color:var(--ink-soft)">Management Team ko wahi modules dikhte hain jo Owner ne Settings me allow kiye hain.</p>
   </div>
  </div>`;
 }
@@ -249,7 +269,7 @@ function finishLogin(role){
  state.role=role;
  localStorage.gaushalaRole=role;
  localStorage.gaushalaLoggedIn="1";
- state.page=role==="Management Team"?"Milk":"Dashboard";
+ state.page=role==="Management Team"?firstAllowedPage():"Dashboard";
  renderShell();
 }
 function logout(){
@@ -264,7 +284,7 @@ function infoIcon(text){
 document.addEventListener("click",e=>{
  document.querySelectorAll("details.info[open]").forEach(d=>{if(!d.contains(e.target))d.removeAttribute("open")});
 });
-const paths=["animals","pregnancies","calvings","milkRecords","milkSources","milkInsourceRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog"];
+const paths=["animals","pregnancies","calvings","milkRecords","milkSources","milkInsourceRecords","healthChecks","treatments","medicines","vaccinations","deworming","tickControl","nailCutting","feedInventory","sheds","workers","tasks","expenses","income","quarantine","movements","births","notifications","mediaLog","appConfig"];
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function id(prefix){return prefix+"-"+Math.random().toString(36).slice(2,7).toUpperCase()}
@@ -639,12 +659,17 @@ async function loadAll(){
    db.ref(p).on("value",s=>{
     state.data[p]=s.val()||{};
     if(firstSnapshot){firstSnapshot=false;res();}
-    else if(document.getElementById("content")){renderPage();}
+    else if(document.getElementById("content")){
+     if(p==="appConfig"&&state.role==="Management Team"){ // Owner ne access badla -> menu bhi turant badal do
+      if(isModuleHidden(state.page))state.page=firstAllowedPage();
+      renderShell();
+     }else renderPage();
+    }
    },err=>{console.error(p,err);if(firstSnapshot){firstSnapshot=false;res()}});
   })));
   if(localStorage.gaushalaLoggedIn==="1"&&ROLE_PERMISSIONS[localStorage.gaushalaRole]!==undefined){
    state.role=localStorage.gaushalaRole;
-   if(isModuleHidden(state.page))state.page=state.role==="Management Team"?"Milk":"Dashboard";
+   if(isModuleHidden(state.page))state.page=state.role==="Management Team"?firstAllowedPage():"Dashboard";
    renderShell();
   }else{
    loginScreen();
@@ -820,11 +845,11 @@ async function submitAnimal(existing){
 }
 function pregnancyPage(){
  let rows=list("pregnancies").sort((a,b)=>(a.expectedCalvingDate||"").localeCompare(b.expectedCalvingDate||""));
- return pageHeader("Pregnancy & Calving","Breeding date + 283 days se expected calving automatically calculate hota hai.",`<button class="btn btn-primary" onclick="openPregnancy()">＋ Record Pregnancy</button>`,"Jab cow ko AI ya natural mating karayi jaaye, uski breeding date yahan daalein — app khud expected calving date nikaal degi (283 din baad) aur cow ka status 'Pregnant' ho jayega.")
+ return pageHeader("Pregnancy & Calving","Breeding date + 283 days se expected calving automatically calculate hota hai.",isModuleViewOnly("Pregnancy")?"":`<button class="btn btn-primary" onclick="openPregnancy()">＋ Record Pregnancy</button>`,"Jab cow ko AI ya natural mating karayi jaaye, uski breeding date yahan daalein — app khud expected calving date nikaal degi (283 din baad) aur cow ka status 'Pregnant' ho jayega.")
  +`<div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">${stat("Pregnant records",rows.length,"🤰")}${stat("Due ≤30 days",rows.filter(x=>daysTo(x.expectedCalvingDate)>=0&&daysTo(x.expectedCalvingDate)<=30).length,"📅")}${stat("Overdue",rows.filter(x=>daysTo(x.expectedCalvingDate)<0).length,"⏰")}</div><div class="card p-5 rtable overflow-auto">${rows.length?`<table class="w-full text-sm"><thead><tr class="border-b text-xs text-stone-500 uppercase"><th class="p-3 text-left">Cow</th><th class="p-3 text-left">Breeding</th><th class="p-3 text-left">Expected</th><th class="p-3 text-left">Days</th><th class="p-3 text-left">Status</th></tr></thead><tbody>${rows.map(x=>{let d=daysTo(x.expectedCalvingDate);return `<tr class="border-b"><td class="p-3 rt-main"><b>${esc(x.animalId)}</b><span class="block text-xs text-stone-500">${esc(findAnimal(x.animalId)?.name||"")}</span></td><td class="p-3" data-label="Breeding">${fmt(x.breedingDate)}</td><td class="p-3 font-semibold" data-label="Expected">${fmt(x.expectedCalvingDate)}</td><td class="p-3" data-label="Days">${d<0?`${Math.abs(d)} days overdue`:d===0?"Today":`${d} days`}</td><td class="p-3" data-label="Status">${badge(d<0?"Overdue":d<=30?"Pregnant":"Tracked")}</td></tr>`}).join("")}</tbody></table>`:"<div class='py-12 text-center text-stone-500'>No pregnancy records yet.</div>"}</div>`
 }
 function openPregnancy(){
- if(isModuleHidden("Pregnancy")){toast(`${state.role} role ke paas Pregnancy ka access nahi hai`,false);return}
+ if(isModuleViewOnly("Pregnancy")){toast(`${state.role} role ke paas Pregnancy ka access nahi hai`,false);return}
  const opts=animals().filter(a=>a.gender==="Female"&&a.type!=="Calf").map(a=>`<option value="${a.id}">${a.id} · ${a.name||"Unnamed"}</option>`).join("");
  modal("Record Pregnancy",formGrid(
   `<label class="block text-sm font-semibold text-slate-600">Cow<select class="input mt-1" name="animalId"><option value="">Select cow</option>${opts}</select></label>`+
@@ -1269,6 +1294,32 @@ function storageStats(){
  const cloudBytes=media.reduce((s,x)=>s+Number(x.bytes||0),0);
  return {fbBytes,cloudBytes,cloudCount:media.length};
 }
+function mgmtAccessCard(){
+ const a=mgmtAccess();
+ const rows=NAV_GROUPS.map(([label,keys])=>{
+  const ks=keys.filter(k=>modules[k]&&!OWNER_ONLY_MODULES.includes(k));
+  if(!ks.length)return "";
+  return `<div class="nav-section-label !px-0 !text-stone-500">${esc(label)}</div>`+ks.map(k=>{
+   const cur=a[k]||"hidden";
+   return `<div class="flex items-center justify-between gap-3 py-2 border-b last:border-0" style="border-color:var(--line)"><span class="text-sm font-semibold">${modules[k][0]} ${esc(modules[k][1])}</span><select class="input !w-40 !py-1.5" data-mgmt-module="${esc(k)}"><option value="hidden"${cur==="hidden"?" selected":""}>🚫 Hidden</option><option value="view"${cur==="view"?" selected":""}>👁 View only</option><option value="edit"${cur==="edit"?" selected":""}>✏️ Can edit</option></select></div>`;
+  }).join("");
+ }).join("");
+ return `<div class="card p-5 mt-5"><h3 class="font-bold mb-1">👥 Management Team Access</h3>
+  <p class="text-xs text-stone-600 mb-3">Jo modules yahan chalu karoge, Management Team ko apne menu me wahi dikhenge. <b>Can edit</b> = add/edit/delete bhi kar sakte hain, <b>View only</b> = sirf dekh sakte hain. Settings hamesha sirf Owner ke paas rehti hai. Save karte hi unke phone par turant badal jaata hai.</p>
+  ${rows}
+  <div class="flex flex-wrap gap-2 mt-4"><button class="btn btn-primary" onclick="saveMgmtAccess()">Save Access</button><button class="btn btn-soft" onclick="resetMgmtAccess()">Reset (sirf Milk)</button></div></div>`;
+}
+async function saveMgmtAccess(){
+ if(state.role!=="Owner"){toast("Sirf Owner yeh badal sakta hai",false);return}
+ const obj={};
+ document.querySelectorAll("[data-mgmt-module]").forEach(s=>{obj[s.dataset.mgmtModule]=s.value});
+ try{await db.ref("appConfig/managementAccess").set(obj);toast("Management Team access save ho gaya")}catch(e){toast(e.message,false)}
+}
+async function resetMgmtAccess(){
+ if(state.role!=="Owner")return;
+ const obj={};Object.keys(modules).filter(k=>!OWNER_ONLY_MODULES.includes(k)).forEach(k=>obj[k]=k==="Milk"?"edit":"hidden");
+ try{await db.ref("appConfig/managementAccess").set(obj);toast("Reset ho gaya — sirf Milk")}catch(e){toast(e.message,false)}
+}
 function settingsPage(){
  const s=storageStats();
  return pageHeader("Settings","Configure Cloudinary photo uploads and operational preferences.","","Yahan Cloudinary photo-upload settings aur deworming/tick-control ke schedule interval set karein. Yeh page sirf Owner ko dikhta hai.")
@@ -1276,6 +1327,7 @@ function settingsPage(){
    <div class="card p-5"><h3 class="font-bold mb-4">Cloudinary</h3>${field("Cloud Name","cloudName",state.cloud.name)}${field("Unsigned Upload Preset","cloudPreset",state.cloud.preset)}<p class="text-xs text-stone-500 mt-3">Never put your Cloudinary API secret in browser code. Use an unsigned upload preset only.</p><button class="btn btn-primary mt-4" onclick="saveCloudSettings()">Save Cloudinary Settings</button></div>
    <div class="card p-5"><h3 class="font-bold mb-4">Preventive schedules</h3>${field("Deworming interval (days)","dewormDays",localStorage.dewormDays||"150","number")}${field("Tick control interval (days)","tickDays",localStorage.tickDays||"120","number")}${field("Nail cutting interval (days)","nailDays",localStorage.nailDays||"90","number")}<button class="btn btn-primary mt-4" onclick="localStorage.dewormDays=document.querySelector('[name=dewormDays]').value;localStorage.tickDays=document.querySelector('[name=tickDays]').value;localStorage.nailDays=document.querySelector('[name=nailDays]').value;toast('Schedule settings saved')">Save Schedules</button></div>
  </div>
+ ${mgmtAccessCard()}
  <div class="text-center text-xs text-slate-300 mt-6">Gaushala Management System · ${APP_VERSION}</div>
  <div class="card p-5 mt-5">
   <h3 class="font-bold mb-1">Storage Usage</h3>
@@ -1323,6 +1375,7 @@ function filterBloodlineOptions(q){
 window.filterBloodlineOptions=filterBloodlineOptions;
 function renderPage(){
  const c=document.getElementById("content");if(!c)return;
+ if(isModuleHidden(state.page)){c.innerHTML=`<div class="card p-8 text-center"><div class="text-4xl mb-2">🔒</div><b>Abhi aapke liye koi module allow nahi hai</b><p class="text-sm mt-1" style="color:var(--ink-soft)">Owner se kahein ki Settings → Management Team Access me modules chalu karein.</p></div>`;return}
  let html=state.page==="Dashboard"?dashboard():state.page==="Animals"?animalsPage():state.page==="Pregnancy"?pregnancyPage():state.page==="Milk"?milkPage():state.page==="Blood Line"?bloodlinePage():state.page==="Feed"?feedPage():state.page==="Expenses"?expensesPage():state.page==="Reports"?reportsPage():state.page==="Settings"?settingsPage():simplePage(state.page);
  c.innerHTML=html;
 }
